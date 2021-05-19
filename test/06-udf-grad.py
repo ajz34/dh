@@ -1,0 +1,46 @@
+from deriv_numerical import NucCoordDerivGenerator, NumericDiff
+from dh import DFDH
+from pyscf import gto, scf
+import numpy as np
+
+
+def mol_to_eng_wrapper(xc):
+    def fx(mol):
+        mf = DFDH(mol, xc).run()
+        return mf.e_tot
+    return fx
+
+
+if __name__ == '__main__':
+    mol = gto.Mole(atom="C 0. 0. 0.; H .9 0. 0.; H 0. 1. 0.; H 0. 0. 1.1", basis="cc-pVDZ", spin=1, verbose=0).build()
+    # MP2                    True 7.498407829584219e-07
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper("MP2"))).derivative.reshape(-1, 3)
+    de = DFDH(mol, "MP2").nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # XYG3                   True 1.1251511542881287e-05
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper("XYG3"))).derivative.reshape(-1, 3)
+    de = DFDH(mol, "XYG3").nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # B2PLYP                 False 2.5363622802226926e-05
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper("B2PLYP"))).derivative.reshape(-1, 3)
+    de = DFDH(mol, "B2PLYP").nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # XYGJ-OS                True 1.1723744330949248e-05
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper("XYGJ-OS"))).derivative.reshape(-1, 3)
+    de = DFDH(mol, "XYGJ-OS").nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # HF reference XYG3      True 1.1607850236100559e-05
+    xc = ["HF", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP", 0.3211, 1, 1]
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper(xc))).derivative.reshape(-1, 3)
+    de = DFDH(mol, xc).nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # B3LYP reference MP2    True 7.874094081483651e-07
+    xc = ["B3LYPg", "HF", 1, 1, 1]
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper(xc))).derivative.reshape(-1, 3)
+    de = DFDH(mol, xc).nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # HF                     True 1.354472090042691e-14
+    xc = ["HF", "HF", 0, 1, 1]    # should not be used in actual program! dh does not check situation cc == 0
+    ade = scf.HF(mol).density_fit(auxbasis="cc-pVDZ-jkfit").run().nuc_grad_method().run().de
+    de = DFDH(mol, xc).nuc_grad_method().run().grad_tot
+    print(np.allclose(ade, de, atol=1e-5, rtol=1e-4), abs(ade - de).max())
