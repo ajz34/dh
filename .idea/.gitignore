@@ -6,3 +6,8 @@
 /dataSources.local.xml
 # Editor-based HTTP Client requests
 /httpRequests/
+
+# ajz34
+/sshConfigs.xml
+/webServers.xml
+

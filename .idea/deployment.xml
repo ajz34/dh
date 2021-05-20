@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="xn01">
+        <serverdata>
+          <mappings>
+            <mapping deploy="Documents/2021-05-07-dh/dh" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/tmp-document" />
+            <excludedPath local="true" path="$PROJECT_DIR$/tmp-jupyter" />
+            <excludedPath local="true" path="$PROJECT_DIR$/tmp-program" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
