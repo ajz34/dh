@@ -1,6 +1,7 @@
 # ajz34
 tmp*
 docs
+nohup.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
