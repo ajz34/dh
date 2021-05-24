@@ -1,3 +1,6 @@
+# for development, import dh
+# for general user, import pyscf.dh
+
 from pyscf import gto, lib
 from dh import DFDH
 from pyscf.geomopt.geometric_solver import optimize

@@ -1,5 +1,8 @@
+# for development, import dh
+# for general user, import pyscf.dh
+
 from pyscf import gto
-from dh import RDFDH
+from dh import DFDH
 import numpy as np
 
 np.set_printoptions(5, suppress=True, linewidth=180)
@@ -11,8 +14,8 @@ if __name__ == '__main__':
     #  [-0.16752  0.02649  0.02154]
     #  [ 0.02384 -0.03202  0.01631]
     #  [ 0.01762  0.01483  0.04038]]
-    print(RDFDH(mol, xc="XYG3").run().e_tot)
-    mf = RDFDH(mol, xc="XYG3").nuc_grad_method().run()
+    print(DFDH(mol, xc="XYG3").run().e_tot)
+    mf = DFDH(mol, xc="XYG3").nuc_grad_method().run()
     print(mf.e_tot)
     print(mf.de)
     # B2PLYP
@@ -20,8 +23,8 @@ if __name__ == '__main__':
     #  [-0.17088  0.02598  0.0211 ]
     #  [ 0.02338 -0.03631  0.01602]
     #  [ 0.01726  0.01457  0.03565]]
-    print(RDFDH(mol, xc="B2PLYP").run().e_tot)
-    mf = RDFDH(mol, xc="B2PLYP").nuc_grad_method().run()
+    print(DFDH(mol, xc="B2PLYP").run().e_tot)
+    mf = DFDH(mol, xc="B2PLYP").nuc_grad_method().run()
     print(mf.e_tot)
     print(mf.de)
     # MP2
@@ -29,7 +32,7 @@ if __name__ == '__main__':
     #  [-0.17439  0.02557  0.02063]
     #  [ 0.02301 -0.03636  0.01541]
     #  [ 0.01688  0.01401  0.03824]]
-    print(RDFDH(mol, xc="MP2").run().e_tot)
-    mf = RDFDH(mol, xc="MP2").nuc_grad_method().run()
+    print(DFDH(mol, xc="MP2").run().e_tot)
+    mf = DFDH(mol, xc="MP2").nuc_grad_method().run()
     print(mf.e_tot)
     print(mf.de)

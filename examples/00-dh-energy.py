@@ -1,5 +1,8 @@
+# for development, import dh
+# for general user, import pyscf.dh
+
 from pyscf import gto, dft, mp
-from dh import RDFDH
+from dh import DFDH
 
 
 def get_energy_xDH(mol: gto.Mole, xc_scf: str, c_pt2: float, xc_dh: str or None=None):
@@ -22,19 +25,19 @@ if __name__ == '__main__':
     #          PySCF   -76.2910535257
     #          RDFDH   -76.2910470614
     print(get_energy_xDH(mol, "B3LYPg", 0.3211, "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP"))
-    print(RDFDH(mol, xc="XYG3").run().e_tot)
+    print(DFDH(mol, xc="XYG3").run().e_tot)
     # B2PLYP   QChem   -76.29075997
     #          PySCF   -76.29075969
     #          RDFDH   -76.29076324
     print(get_energy_xDH(mol, "0.53*HF + 0.47*B88, 0.73*LYP", 0.27))
-    print(RDFDH(mol, xc="B2PLYP").run().e_tot)
+    print(DFDH(mol, xc="B2PLYP").run().e_tot)
     # XYGJ-OS  QChem   -76.1460262831
     #          RDFDH   -76.1460317123
-    print(RDFDH(mol, xc="XYGJ-OS").run().e_tot)
+    print(DFDH(mol, xc="XYGJ-OS").run().e_tot)
     # MP2      PySCF   -76.1108060780191
     #          RDFDH   -76.1107838767765
     print(mp.MP2(mol).run().e_tot)
-    print(RDFDH(mol, xc="MP2").run().e_tot)
+    print(DFDH(mol, xc="MP2").run().e_tot)
     # Details:  QChem uses 99, 590 grid; i.e. XC_GRID 000099000590
     #                 no density fitting used in QChem for XYG3, B2PLYP, MP2
     #                 LT-SOS-RI-MP2 for XYGJ-OS
