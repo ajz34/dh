@@ -39,3 +39,4 @@ if __name__ == '__main__':
     print(DFDH(mol, xc="revXYGJ-OS", auxbasis_jk=bas_jk, auxbasis_ri=bas_ri).run().e_tot)
     # DFDH      -56.35174227955246
     print(DFDH(mol, xc="XYGJ-OS5", auxbasis_jk=bas_jk, auxbasis_ri=bas_ri).run().e_tot)
+    # Note: xDH4Gau does not use auxiliary basis set, conventional method only
