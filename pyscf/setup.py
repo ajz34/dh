@@ -14,7 +14,7 @@
 
 NAME         = 'pyscf-dh'
 DESCRIPTION  = 'Doubly-hybrid methods for PySCF'
-VERSION      = '0.2'
+VERSION      = '0.1.1'
 ACKNOWLEDGE  = 'Xin Xu (supervisor and group leader), ' \
                'PySCF Developers, ' \
                'Igor Ying Zhang, Neil Qiang Su, Yonghao Gu, Wenjie Yan, Yangyang Jin (UltraJINX), Shirong Wang'
