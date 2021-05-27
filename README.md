@@ -52,6 +52,9 @@ to much smaller value for `dh` extension.
 
 ## Availibility and Limitations
 
+- Supported features:
+  Res/Unrestricted single point energy, gradient, polarizability
+  for XYG3-like and B2PLYP-like doubly functionals
 - Supported doubly hybrid functionals (and MP2):
     - MP2
     - Early XYG3 family:
@@ -68,7 +71,7 @@ to much smaller value for `dh` extension.
       [PBE0-DH](http://dx.doi.org/10.1063/1.3604569),
       [LS1DH-PBE](https://doi.org/10.1063/1.3640019),
       [PBE0-2](https://doi.org/10.1016/j.cplett.2012.04.045),
-      [PBE-QIDH](http://dx.doi.org/10.1063/1.4890314),
+      [PBE-QIDH](http://dx.doi.org/10.1063/1.4890314)
     - Self-defined functionals
       (only supports pure HF or hybrid GGA functionals, if gradient/electric property is required)
     
@@ -77,11 +80,6 @@ Default functional is XYG3 currently.
 
 ### Near Future Plans
 
-- Another independent module (maybe called `dheng`) handling only energy evaluation for
-  other type of doubly-hybrid functionals,
-  such as D3(BJ) dispersion, Laplace-transformation,
-  long-range corrected PT2, renormalization based methods,
-  random-phase-approximation (RPA) based methods, etc.;
 - Quadrupole;
 - Rectify APIs, and more formal logging and timing;
 - API document and user document;
@@ -90,6 +88,11 @@ Default functional is XYG3 currently.
 
 ### Future Plans?
 
+- Another independent module (maybe called `dheng`) handling only energy evaluation for
+  more doubly-hybrid functionals,
+  such as D3(BJ) dispersion, Laplace-transformation,
+  long-range corrected PT2, renormalization based methods,
+  random-phase-approximation (RPA) based methods, etc.;
 - Hessian and dipole-derivative;
 - Frozen core;
 - RIJONX, RICOSX and conventional SCF method supports;
