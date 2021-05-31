@@ -29,6 +29,10 @@ if __name__ == '__main__':
     nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper("XYGJ-OS"))).derivative.reshape(-1, 3)
     de = DFDH(mol, "XYGJ-OS").nuc_grad_method().run().grad_tot
     print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # DSD-PBEP86-D3          False 1.6581324399911335e-05
+    nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper("DSD-PBEP86-D3"))).derivative.reshape(-1, 3)
+    de = DFDH(mol, "DSD-PBEP86-D3").nuc_grad_method().run().grad_tot
+    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
     # HF reference XYG3      True 1.2058441408377418e-05
     xc = ["HF", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP", 0.3211, 1, 1]
     nde = NumericDiff(NucCoordDerivGenerator(mol, mol_to_eng_wrapper(xc))).derivative.reshape(-1, 3)
