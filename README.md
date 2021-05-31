@@ -73,7 +73,7 @@ to extension `pyscf/dftd3`.
 ## Availibility and Limitations
 
 - Supported features:
-  Res/Unrestricted single point energy, gradient, polarizability
+  Res/Unrestricted single point energy, gradient, static polarizability
   for XYG3-like and B2PLYP-like doubly functionals
 - Supported doubly hybrid functionals (and MP2, certainly):
     - MP2
@@ -111,7 +111,7 @@ to other softwares thoroughly!
 - API document and user document;
 - Efficiency benchmarking
     - Preliminary tests shows good performance for small molecules with large basis sets;
-    - Polarizability should gain much speedup.
+    - Polarizability should gain much speedup due to its algorithm implementation.
 
 ### Future Plans?
 
@@ -131,7 +131,8 @@ to other softwares thoroughly!
 
 - For functional energy evaluation, refers to the origin paper of those functionals.  
 
-- For first order properties (atom nuclear gradient, dipole moment):
+- For first order properties (xDH atom nuclear gradient, dipole moment first implemented
+  in local NWChem):
 
   > Neil Qiang Su, Igor Ying Zhang, Xin Xu.
   > *J. Comput. Chem.* **2013**, *34*, 1759-1774.
@@ -142,7 +143,7 @@ to other softwares thoroughly!
   > and Assessment
 
 - For second order properties
-  (hessian of xDH obtained from conventional SCF/PT2 in Gaussian 09,
+  (hessian of xDH obtained from conventional SCF/PT2 in local Gaussian 09,
   where polarizability is also implemented)
   that relates to this work:
 
