@@ -42,13 +42,33 @@ Hessian is currently not implemented.
 
 ## Install
 
+### `dh` as PySCF extension
 Refer to installation of PySCF [Extension modules](https://pyscf.org/install.html#extension-modules).
 Declare `PYSCF_EXT_PATH=$PYSCF_EXT_PATH:/path/to/dh` should work.
 
-This extension overwhelmingly relies on [pyscf-tblis](https://github.com/pyscf/pyscf-tblis).
+### `pyscf-tblis` extension
+This extension overwhelmingly relies on [pyscf/pyscf-tblis](https://github.com/pyscf/pyscf-tblis).
 Also recommands modifing `EINSUM_MAX_SIZE` (in
 [tblis_einsum.py](https://github.com/pyscf/pyscf-tblis/blob/160333ab28d0d9c6900bd5b77efc8d03dd1c74c5/pyscf/tblis_einsum/tblis_einsum.py#L45))
+and `lib_einsum_max_size` (in your [PySCF config](https://pyscf.org/install.html#cmake-options-and-compiling-flags), refer to `PYSCF_CONFIG_FILE`)
 to much smaller value for `dh` extension.
+
+### `dftd3` extension
+If you are not using functionals with "-D3" suffix, you can safely omit this part.
+
+To calculate functionals that includes D3 dispersion correction, user may need to install
+[pyscf/dftd3]() as an extension of PySCF. 
+
+Furthermore, this extension requires a dynamic library `libdftd3.so`, which should be compiled by user.
+- Source code of the library could be accessed from [ajz34/libdftd3](https://github.com/ajz34/libdftd3);
+- Make the library in folder `lib`;
+- Copy the generated file `libdftd3.so` to `path_to_pyscf_dftd3/pyscf/dftd3`, where `itrf.py` exists.
+
+A reminder to experienced PySCF users is that, the library
+[ajz34/libdftd3](https://github.com/ajz34/libdftd3) is not identical to it's original form
+[cuanto/libdftd3](https://github.com/cuanto/libdftd3). So please do not copy your old `libdftd3.so`
+to extension `pyscf/dftd3`.
+
 
 ## Availibility and Limitations
 
