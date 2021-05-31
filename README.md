@@ -55,7 +55,7 @@ to much smaller value for `dh` extension.
 - Supported features:
   Res/Unrestricted single point energy, gradient, polarizability
   for XYG3-like and B2PLYP-like doubly functionals
-- Supported doubly hybrid functionals (and MP2):
+- Supported doubly hybrid functionals (and MP2, certainly):
     - MP2
     - Early XYG3 family:
       [XYG3](https://doi.org/10.1073/pnas.0901093106),
@@ -65,6 +65,7 @@ to much smaller value for `dh` extension.
       revXYG3, revXYGJ-OS, XYG5, XYGJ-OS5, XYG6, XYG7
     - B2P family:
       [B2PLYP](http://dx.doi.org/10.1063/1.2148954),
+      [B2PLYP-D3](https://doi.org/10.1063/1.3382344),
       [B2GPPLYP](https://doi.org/10.1021/jp801805p),
       [mPW2PLYP](http://dx.doi.org/10.1039/B608478H)
     - PBE related:
@@ -72,25 +73,31 @@ to much smaller value for `dh` extension.
       [LS1DH-PBE](https://doi.org/10.1063/1.3640019),
       [PBE0-2](https://doi.org/10.1016/j.cplett.2012.04.045),
       [PBE-QIDH](http://dx.doi.org/10.1063/1.4890314)
+    - [DSD family](https://doi.org/10.1002/jcc.23391)
+      with D3(BJ) dispersion correction (version 2013):
+      DSD-PBEP86-D3, DSD-PBEPBE-D3, DSD-BLYP-D3, DSD-PBEB95-D3
     - Self-defined functionals
       (only supports pure HF or hybrid GGA functionals, if gradient/electric property is required)
     
 Default functional is XYG3 currently.
 
+**Warning**: Energy of DFT-D3(BJ) dispersion functionals haven't been tested and compared
+to other softwares thoroughly!
 
 ### Near Future Plans
 
 - Quadrupole;
 - Rectify APIs, and more formal logging and timing;
 - API document and user document;
-- Efficiency benchmarking;
-- D3(BJ) dispersion derivative properties.
+- Efficiency benchmarking
+    - Preliminary tests shows good performance for small molecules with large basis sets;
+    - Polarizability should gain much speedup.
 
 ### Future Plans?
 
 - Another independent module (maybe called `dheng`) handling only energy evaluation for
   more doubly-hybrid functionals,
-  such as D3(BJ) dispersion, Laplace-transformation,
+  such as Laplace-transformation,
   long-range corrected PT2, renormalization based methods,
   random-phase-approximation (RPA) based methods, etc.;
 - Hessian and dipole-derivative;
