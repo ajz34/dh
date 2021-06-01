@@ -80,7 +80,7 @@ to extension `pyscf/dftd3`.
 - Supported features:
   Res/Unrestricted single point energy, gradient, static polarizability
   for XYG3-like and B2PLYP-like doubly functionals
-- Supported doubly hybrid functionals (and MP2, certainly):
+- Supported doubly hybrid functional (and MP2, certainly) keywords:
     - MP2
     - Early XYG3 family:
       [XYG3](https://doi.org/10.1073/pnas.0901093106),
@@ -101,8 +101,12 @@ to extension `pyscf/dftd3`.
     - [DSD family](https://doi.org/10.1002/jcc.23391)
       with D3(BJ) dispersion correction (version 2013):
       DSD-PBEP86-D3, DSD-PBEPBE-D3, DSD-BLYP-D3, DSD-PBEB95-D3
+    - Non-consistent functionals:
+      HF-B3LYP, HF-PBE0 (no PT2 contribution)
     - Self-defined functionals
       (only supports pure HF or hybrid GGA functionals, if gradient/electric property is required)
+      
+      Format: `("xc_SCF", "xc_energy", coef_PT2, coef_OS_PT2, coef_SS_PT2)`
     
 Default functional is XYG3 currently.
 
