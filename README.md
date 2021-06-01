@@ -13,7 +13,7 @@ Runs in disk-based way by default.
 from pyscf import gto, dh
 mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVDZ", verbose=0).build()
 mf = dh.DFDH(mol, xc="XYG3").run()
-print(mf.e_tot)
+print(mf.e_tot)  # -76.36230265411723 in Hartree
 ```
 
 Name `dh` refers to **D**oubly **H**ybrid.
@@ -22,11 +22,16 @@ Name `dh` refers to **D**oubly **H**ybrid.
 ### Geometric optimization
 
 ```python
-from pyscf import gto, dh
+from pyscf import gto, dh, data
 from pyscf.geomopt.berny_solver import optimize  # or geometric_solver
 mol = gto.Mole(atom="O; H 1 1.0; H 1 1.0 2 104.5", basis="cc-pVDZ", verbose=0).build()
 mf = dh.DFDH(mol, xc="XYG3").nuc_grad_method()
 mol_eq = optimize(mf)  # optimized molecule object
+# print geom coordinates in Angstrom
+print(mol_eq.atom_coords() * data.nist.BOHR)
+# [[ 0.00573557  0.          0.00740783]
+#  [ 0.9649555   0.          0.02121004]
+#  [-0.22107107  0.          0.93952977]]
 ```
 
 ### Polarizability
@@ -35,7 +40,7 @@ mol_eq = optimize(mf)  # optimized molecule object
 from pyscf import gto, dh
 mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVDZ", verbose=0).build()
 mf = dh.DFDH(mol, xc="XYG3").polar_method().run()
-print(mf.pol_tot)
+print(mf.pol_tot.trace() / 3)  # 4.9747082620200915 in a.u.
 ```
 
 Hessian is currently not implemented.
