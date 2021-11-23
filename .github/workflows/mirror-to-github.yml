@@ -1,0 +1,21 @@
+name: 'mirror'
+on:
+  push:
+    branches:
+        - __mirror
+  schedule:
+    - cron: '* 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    name: mirror
+    steps:
+      - name: mirror-to-github
+        id: mirror-to-github
+        uses: bridgelightcloud/github-mirror-action@v2
+        with:
+          origin: https://gitee.com/ajz34/dh.git
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
