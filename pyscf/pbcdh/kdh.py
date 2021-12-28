@@ -2,8 +2,55 @@ from pyscf import dh
 # typing import
 from typing import Tuple, TYPE_CHECKING
 from pyscf import lib
-from pyscf.pbc import gto, scf, df, mp
+from pyscf.pbc import gto, scf, dft, df, mp
 import numpy as np
+
+@timing
+def energy_elec_nc(mf: KDH, mo_coeff=None, h1e=None, vhf=None, **_):
+    if mo_coeff is None:
+        if mf.mf_s.e_tot == 0:
+            mf.run_scf()
+            if mf.xc_n is None:  # if bDH-like functional, just return SCF energy
+                return mf.mf_s.e_tot - mf.mf_s.energy_nuc(), None
+        mo_coeff = mf.mf_s.mo_coeff
+    #mo_occ = mf.mf_s.mo_occ
+    #if mo_occ is NotImplemented:
+    #    if not mf.unrestricted:
+    #        mo_occ = scf.hf.get_occ(mf.mf_s)
+    #    else:
+    #        mo_occ = scf.uhf.get_occ(mf.mf_s)
+    #dm = mf.mf_s.make_rdm1(mo_coeff, mo_occ)
+    dm = mf.mf_s.make_rdm1()
+    dm = lib.tag_array(dm, mo_coeff=mo_coeff, mo_occ=mo_occ)
+    eng_nc = mf.mf_n.energy_elec(dm=dm, h1e=h1e, vhf=vhf)
+    return eng_nc
+
+@timing
+def energy_elec_mp2(mf: KDH, mo_coeff=None, mo_energy=None, dfobj=None, 
+                    #Y_ia_ri=None, t_ijab_blk=None, 
+                    eval_ss=True, **_):
+    if mo_coeff is None:
+        if mf.mf_s.e_tot == 0:
+            mf.run_scf()
+        mo_coeff = mf.mo_coeff
+    if mo_energy is None:
+        if mf.mf_s.e_tot == 0:
+            mf.run_scf()
+        mo_energy = mf.mo_energy
+    kmp = mp.KMP2(mf.mf_s, mo_coeff=mo_coeff)
+    kmp.mo_energy = mo_energy
+    eng = kmp.kernel()[0]
+    return eng
+    
+# temporary approach since KMP2 cannot do SCS
+@timing
+def energy_elec_pt2(mf: KDH, params=None, eng_bi=None, **kwargs):
+    if not mf.eval_pt2:  # not a PT2 functional
+        return 0, 0, 0
+    cc, c_os, c_ss = params if params else mf.cc, mf.c_os, mf.c_ss
+    eng_bi = mf.energy_elec_mp2(eval_ss=mf.eval_ss, **kwargs)
+    return (cc * eng_bi,  # Total
+            0, 0)
 
 class KDH(dh.RDFDH):
 
@@ -48,3 +95,68 @@ class KDH(dh.RDFDH):
         #self.grids_cpks = grids_cpks if grids_cpks else self.grids         # type: dft.grid.Grids
         self.mf_s = mf_s                                                   # type: dft.rks.RKS
         #self.mf_s.grids = self.grids
+        # parse non-consistent method
+        self.xc_n = None if self.xc_n == self.xc else self.xc_n            # type: str or None
+        self.mf_n = self.mf_s                                              # type: dft.rks.RKS
+        if self.xc_n:
+            if unrestricted:
+                self.mf_n = dft.UKS(mol, xc=self.xc_n).density_fit(auxbasis=auxbasis_jk)
+            else:
+                self.mf_n = dft.KS(mol, xc=self.xc_n).density_fit(auxbasis=auxbasis_jk)
+            self.mf_n.grids = self.mf_s.grids
+            self.mf_n.grids = self.grids
+        # parse hybrid coefficients
+        self.ni = self.mf_s._numint
+        self.cx = self.ni.hybrid_coeff(self.xc)
+        self.cx_n = self.ni.hybrid_coeff(self.xc_n)
+        # parse density fitting object
+        #self.df_jk = mf_s.with_df  # type: df.DF
+        #self.aux_jk = self.df_jk.auxmol
+        #self.df_ri = df.DF(mol, auxbasis_ri) if not self.same_aux else self.df_jk
+        #self.aux_ri = self.df_ri.auxmol
+        # other preparation
+        self.tensors = HybridDict()
+        self.mol = mol
+        self.nao = mol.nao  # type: int
+        self.nocc = mol.nelec[0]
+        # variables awaits to be build
+        self.mo_coeff = NotImplemented
+        self.mo_energy = NotImplemented
+        self.mo_occ = NotImplemented
+        #self.C = self.Co = self.Cv = NotImplemented
+        #self.e = self.eo = self.ev = NotImplemented
+        #self.D = NotImplemented
+        self.nmo = self.nvir = NotImplemented
+        #self.so = self.sv = self.sa = NotImplemented
+        # results
+        self.e_tot = NotImplemented
+        self.eng_tot = self.eng_nc = self.eng_pt2 = self.eng_nuc = self.eng_os = self.eng_ss = NotImplemented
+        # DANGEROUS PLACE
+        # we could first initialize nmo as nao
+        self.nmo = self.nao
+        self.nvir = self.nmo - self.nocc
+
+    @timing
+    def run_scf(self, **kwargs):
+        #self.mf_s.grids = self.mf_n.grids = self.grids
+        #self.build()
+        mf = self.mf_s
+        if mf.e_tot == 0:
+            mf.kernel(**kwargs)
+        # prepare
+        #self.C = self.mo_coeff = mf.mo_coeff
+        #self.e = self.mo_energy = mf.mo_energy
+        self.mo_occ = mf.mo_occ
+        #self.D = mf.make_rdm1(mf.mo_coeff)
+        nocc = self.nocc
+        nmo = self.nmo = self.C.shape[1]
+        self.nvir = nmo - nocc
+        #self.so, self.sv, self.sa = slice(0, nocc), slice(nocc, nmo), slice(0, nmo)
+        #self.Co, self.Cv = self.C[:, self.so], self.C[:, self.sv]
+        #self.eo, self.ev = self.e[self.so], self.e[self.sv]
+        return self
+
+    energy_elec_nc = energy_elec_nc
+    energy_elec_mp2 = energy_elec_mp2
+    energy_elec_pt2 = energy_elec_pt2
+
