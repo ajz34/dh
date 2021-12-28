@@ -1,4 +1,6 @@
+from __future__ import annotations
 from pyscf import dh
+from pyscf.dh.dhutil import parse_xc_dh, gen_batch, calc_batch_size, HybridDict, timing, restricted_biorthogonalize
 # typing import
 from typing import Tuple, TYPE_CHECKING
 from pyscf import lib
@@ -13,7 +15,7 @@ def energy_elec_nc(mf: KDH, mo_coeff=None, h1e=None, vhf=None, **_):
             if mf.xc_n is None:  # if bDH-like functional, just return SCF energy
                 return mf.mf_s.e_tot - mf.mf_s.energy_nuc(), None
         mo_coeff = mf.mf_s.mo_coeff
-    #mo_occ = mf.mf_s.mo_occ
+    mo_occ = mf.mf_s.mo_occ
     #if mo_occ is NotImplemented:
     #    if not mf.unrestricted:
     #        mo_occ = scf.hf.get_occ(mf.mf_s)
@@ -22,7 +24,7 @@ def energy_elec_nc(mf: KDH, mo_coeff=None, h1e=None, vhf=None, **_):
     #dm = mf.mf_s.make_rdm1(mo_coeff, mo_occ)
     dm = mf.mf_s.make_rdm1()
     dm = lib.tag_array(dm, mo_coeff=mo_coeff, mo_occ=mo_occ)
-    eng_nc = mf.mf_n.energy_elec(dm=dm, h1e=h1e, vhf=vhf)
+    eng_nc = mf.mf_n.energy_elec(dm_kpts=dm, h1e_kpts=h1e, vhf=vhf)
     return eng_nc
 
 @timing
@@ -52,18 +54,20 @@ def energy_elec_pt2(mf: KDH, params=None, eng_bi=None, **kwargs):
     return (cc * eng_bi,  # Total
             0, 0)
 
-class KDH(dh.RDFDH):
+class KDH(dh.rdfdh.RDFDH):
 
     def __init__(self,
                  mol: gto.Cell,
                  xc: str or tuple = "XYG3",
                  #auxbasis_jk: str or dict or None = None,
                  #auxbasis_ri: str or dict or None = None,
-                 #grids: dft.Grids = None,
+                 grids: dft.Grids = None,
                  #grids_cpks: dft.Grids = None,
                  unrestricted: bool = False,  # only for class initialization
                  kpts = np.zeros((1,3))
                  ):
+        # tunable flags
+        self.with_t_ijab = False  # only in energy calculation; polarizability is forced dump t2 to disk or mem
         self.max_memory = mol.max_memory
         # Parse xc code
         # It's tricky to say that, self.xc refers to SCF xc, and self.xc_dh refers to double hybrid xc
@@ -91,18 +95,18 @@ class KDH(dh.RDFDH):
             mf_s = dft.KUKS(mol, kpts, xc=self.xc_n).rs_density_fit()
         else:
             mf_s = dft.KRKS(mol, kpts, xc=self.xc_n).rs_density_fit()
-        #self.grids = grids if grids else mf_s.grids                        # type: dft.grid.Grids
+        self.grids = grids if grids else mf_s.grids                        # type: dft.grid.Grids
         #self.grids_cpks = grids_cpks if grids_cpks else self.grids         # type: dft.grid.Grids
         self.mf_s = mf_s                                                   # type: dft.rks.RKS
-        #self.mf_s.grids = self.grids
+        self.mf_s.grids = self.grids
         # parse non-consistent method
         self.xc_n = None if self.xc_n == self.xc else self.xc_n            # type: str or None
         self.mf_n = self.mf_s                                              # type: dft.rks.RKS
         if self.xc_n:
             if unrestricted:
-                self.mf_n = dft.UKS(mol, xc=self.xc_n).density_fit(auxbasis=auxbasis_jk)
+                self.mf_n = dft.KUKS(mol, kpts, xc=self.xc_n).rs_density_fit()
             else:
-                self.mf_n = dft.KS(mol, xc=self.xc_n).density_fit(auxbasis=auxbasis_jk)
+                self.mf_n = dft.KRKS(mol, kpts, xc=self.xc_n).rs_density_fit()
             self.mf_n.grids = self.mf_s.grids
             self.mf_n.grids = self.grids
         # parse hybrid coefficients
@@ -135,6 +139,10 @@ class KDH(dh.RDFDH):
         # we could first initialize nmo as nao
         self.nmo = self.nao
         self.nvir = self.nmo - self.nocc
+    
+    @timing
+    def build(self):
+        pass
 
     @timing
     def run_scf(self, **kwargs):
@@ -144,13 +152,13 @@ class KDH(dh.RDFDH):
         if mf.e_tot == 0:
             mf.kernel(**kwargs)
         # prepare
-        #self.C = self.mo_coeff = mf.mo_coeff
-        #self.e = self.mo_energy = mf.mo_energy
+        self.C = self.mo_coeff = mf.mo_coeff
+        self.e = self.mo_energy = mf.mo_energy
         self.mo_occ = mf.mo_occ
         #self.D = mf.make_rdm1(mf.mo_coeff)
         nocc = self.nocc
-        nmo = self.nmo = self.C.shape[1]
-        self.nvir = nmo - nocc
+        #nmo = self.nmo = self.C.shape[1]
+        #self.nvir = nmo - nocc
         #self.so, self.sv, self.sa = slice(0, nocc), slice(nocc, nmo), slice(0, nmo)
         #self.Co, self.Cv = self.C[:, self.so], self.C[:, self.sv]
         #self.eo, self.ev = self.e[self.so], self.e[self.sv]
