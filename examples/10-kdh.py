@@ -7,7 +7,9 @@ KDH at an individual k-point
 from functools import reduce
 import numpy
 from pyscf.pbc import gto
-from pyscf import pbcdh
+from pyscf import pbcdh, lib
+
+lib.num_threads(28)
 
 cell = gto.Cell()
 cell.atom='''
@@ -25,9 +27,10 @@ cell.verbose = 5
 cell.build()
 
 #
-# KHF and KMP2 with 2x2x2 k-points
+# DF-KDH with 2x2x2 k-points
 #
 kpts = cell.make_kpts([2,2,2])
+#kpts = cell.make_kpts([4,4,4])
 #kmf = scf.KRHF(cell)#.rs_density_fit()
 #kmf.kpts = kpts
 #ehf = kmf.kernel()
@@ -35,18 +38,5 @@ kpts = cell.make_kpts([2,2,2])
 mypt = pbcdh.KDH(cell, xc="XYG3", kpts=kpts)
 mypt.max_memory = 10000
 mypt.kernel()
-print("KXYG3 energy (per unit cell) =", mypt.e_tot)
-
-exit()
-#
-# The KHF and KMP2 for single k-point calculation.
-#
-kpts = cell.get_abs_kpts([0.25, 0.25, 0.25])
-kmf = scf.KRHF(cell)
-kmf.kpts = kpts
-ehf = kmf.kernel()
-
-mypt = mp.KMP2(kmf)
-mypt.kernel()
-print("KMP2 energy (per unit cell) =", mypt.e_tot)
+print("PBC-XYG3 energy (per unit cell) =", mypt.e_tot)
 
