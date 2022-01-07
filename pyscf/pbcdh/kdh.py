@@ -85,6 +85,10 @@ class KDH(dh.rdfdh.RDFDH):
             xc_list, xc_add = xc
         self.xc, self.xc_n, self.cc, self.c_os, self.c_ss = xc_list
         self.xc_add = xc_add
+        
+        if (self.c_os != 1) or (self.c_ss != 1):
+            raise NotImplementedError("SCS or OS KMP2 not implemented")
+
         # parse auxiliary basis
         #self.auxbasis_jk = auxbasis_jk = auxbasis_jk if auxbasis_jk else df.make_auxbasis(mol, mp2fit=False)
         #self.auxbasis_ri = auxbasis_ri = auxbasis_ri if auxbasis_ri else df.make_auxbasis(mol, mp2fit=True)
@@ -95,6 +99,10 @@ class KDH(dh.rdfdh.RDFDH):
             mf_s = dft.KUKS(mol, kpts, xc=self.xc_n).rs_density_fit()
         else:
             mf_s = dft.KRKS(mol, kpts, xc=self.xc_n).rs_density_fit()
+        # only RSDF supported now. Maybe GDF can be added. MDF is not recommended for k-point SCF.
+        # it seems default auxbasis (ETB) works fine for RSDF. weigend is also ok, but now there's 
+        #   no good PBC-auxbasis recommender for each basis, so we did not make it an option.
+
         self.grids = grids if grids else mf_s.grids                        # type: dft.grid.Grids
         #self.grids_cpks = grids_cpks if grids_cpks else self.grids         # type: dft.grid.Grids
         self.mf_s = mf_s                                                   # type: dft.rks.RKS
