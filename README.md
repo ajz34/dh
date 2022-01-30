@@ -62,7 +62,7 @@ to much smaller value for `dh` extension.
 If you are not using functionals with "-D3" suffix, you can safely omit this part.
 
 To calculate functionals that includes D3 dispersion correction, user may need to install
-[pyscf/dftd3]() as an extension of PySCF. 
+[pyscf/dftd3](https://github.com/pyscf/dftd3) as an extension of PySCF. 
 
 Furthermore, this extension requires a dynamic library `libdftd3.so`, which should be compiled by user.
 - Source code of the library could be accessed from [ajz34/libdftd3](https://github.com/ajz34/libdftd3);
