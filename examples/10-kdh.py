@@ -9,7 +9,7 @@ import numpy
 from pyscf.pbc import gto
 from pyscf import pbcdh, lib
 
-lib.num_threads(28)
+#lib.num_threads(28)
 
 cell = gto.Cell()
 cell.atom='''
