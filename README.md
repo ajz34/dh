@@ -46,7 +46,7 @@ print(mf.pol_tot.trace() / 3)  # 4.9747082620200915 in a.u.
 Hessian is currently not implemented.
 
 ## Install
-### Pre-requistes
+### Pre-requisites
 * python >= 3.7
 
 ### `dh` as PySCF extension
