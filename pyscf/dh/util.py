@@ -16,6 +16,13 @@ class HybridDict(dict):
 
     A dictionary specialized to store data both in memory and in disk.
 
+    Parameters
+    ----------
+    chkfile_name : str
+        File name
+    pathdir
+        File directory
+
     Notes
     -----
     This class is inherited from ``dict``, and you surely could store objects other than numpy or h5py tensors.
@@ -23,14 +30,6 @@ class HybridDict(dict):
     But for those objects, you may not utilize the following attribute functions.
     """
     def __init__(self, chkfile_name=None, pathdir=None, **kwargs):
-        """
-        Parameters
-        ----------
-        chkfile_name
-            File name
-        pathdir
-            File directory
-        """
         super(HybridDict, self).__init__(**kwargs)
         # initialize input variables
         if pathdir is None:
@@ -47,8 +46,10 @@ class HybridDict(dict):
         Create an tensor by h5py style
 
         There could be two schemes:
-            1. Tensor data is already available
-            2. Tensor data is note available, but its shape is known
+
+        1. Tensor data is already available
+        2. Tensor data is note available, but its shape is known
+
         Note that API user should either provide data or shape info. Providing both of them or none is invalid.
 
         Parameters
