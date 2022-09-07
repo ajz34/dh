@@ -1,13 +1,42 @@
-from pyscf import lib, df
-from pyscf.ao2mo import _ao2mo
-
 import tempfile
 import h5py
 import pickle
 import numpy as np
 import shutil
 import os
-import dataclasses
+from dataclasses import dataclass
+from contextlib import contextmanager
+
+from typing import List, Tuple
+
+
+class RestrictedDataset(h5py.Dataset):
+    """
+    Writing-Restricted h5py Dataset
+
+    This inheritance aquire that h5py data is only writable when
+    ``self.attrs["writeable"]`` is set to True.
+
+    Note
+    ----
+    This implementation requires direct modification to ``h5py._hl.dataset``.
+    If other programs uses ``h5py.File.create_dataset``, they may actually
+    uses this ``RestrictedDataset`` class.
+    To avoid possible inconvenience, the attribute ``writeable`` is True
+    by default.
+
+    This writeable-protection class is currently not activated.
+    To activate this class, please replace original ``h5py.Dataset`` by
+    ``h5py._hl.dataset.Dataset = RestrictedDataset``.
+    """
+    def __init__(self, *args, **kwargs):
+        super(RestrictedDataset, self).__init__(*args, *kwargs)
+        self.attrs["writeable"] = True
+
+    def __setitem__(self, *args, **kwargs):
+        if "writeable" in self.attrs and not self.attrs["writeable"]:
+            raise ValueError("assignment destination is read-only")
+        super(RestrictedDataset, self).__setitem__(*args, *kwargs)
 
 
 class HybridDict(dict):
@@ -19,21 +48,30 @@ class HybridDict(dict):
     Parameters
     ----------
     chkfile_name : str
-        File name
-    pathdir
-        File directory
+        File name for HDF5 data
+    pathdir : str
+        File directory for HDF5 data
 
-    Notes
-    -----
+    Note
+    ----
     This class is inherited from ``dict``, and you surely could store objects other than numpy or h5py tensors.
 
     But for those objects, you may not utilize the following attribute functions.
+
+    It is recommanded to store tensors directly by key, instead of tuples or lists. For example, to store MO
+    coefficients for UHF, use keys ``"mo_coeff(a)": C_a`` and ``"mo_coeff(b)": C_b`` or something similar,
+    instead of using ``"mo_coeff": (C_a, C_b)``. Actually, ``"mo_coeff": np.array([C_a, C_b])`` should also be
+    acceptable.
     """
     def __init__(self, chkfile_name=None, pathdir=None, **kwargs):
         super(HybridDict, self).__init__(**kwargs)
         # initialize input variables
         if pathdir is None:
-            pathdir = lib.param.TMPDIR
+            try:
+                from pyscf import lib
+                pathdir = lib.param.TMPDIR
+            except ImportError:
+                pathdir = "/tmp/"
         if chkfile_name is None:
             self._chkfile = tempfile.NamedTemporaryFile(dir=pathdir)
             chkfile_name = self._chkfile.name
@@ -41,7 +79,7 @@ class HybridDict(dict):
         self.chkfile_name = chkfile_name
         self.chkfile = h5py.File(self.chkfile_name, "r+")
 
-    def create(self, name, data=None, incore=True, shape=None, dtype=None, **kwargs):
+    def create(self, name, data=None, incore=True, shape=None, dtype=np.float64, **kwargs):
         """
         Create an tensor by h5py style
 
@@ -54,20 +92,20 @@ class HybridDict(dict):
 
         Parameters
         ----------
-        name
+        name : str
             Tensor name as key of dictionary
-        data
+        data : np.array
             Tensor data if scheme 1; otherwise leave it to None
-        incore
+        incore : bool
           True: store tensor in numpy; False: store tensor by h5py to disk
-        shape
+        shape : Tuple[int, ...]
            Tensor shape if scheme 2, tuple like; otherwise leave it to None
-        dtype
+        dtype : type
             Tesor data type (np.float32, int, etc)
 
         Returns
         -------
-        The tensor you've created.
+        np.ndarray or h5py.Dataset
         """
         # create logic check
         if data is None and shape is None:
@@ -86,12 +124,11 @@ class HybridDict(dict):
                 # AttributeError -- [certain other type] object has no attribute 'shape'
                 pass
             self.delete(name)
-        dtype = dtype if dtype is not None else np.float64
         if not incore:
             self.chkfile.create_dataset(name, shape=shape, dtype=dtype, data=data, **kwargs)
             self.setdefault(name, self.chkfile[name])
         elif data is not None:
-            self.setdefault(name, data)
+            self.setdefault(name, np.asarray(data, dtype=dtype))
         elif data is None and shape is not None:
             self.setdefault(name, np.zeros(shape=shape, dtype=dtype))
         else:
@@ -104,11 +141,11 @@ class HybridDict(dict):
 
         Parameters
         ----------
-        key
+        key : str
             Key of this item
 
-        Notes
-        -----
+        Note
+        ----
         If the item to be deleted is an h5py dataset, then the data on disk will also be deleted.
         However, h5py may not handle deleting an item delicately, meaning that deleted item does
         not necessarily (usually not) free the space you may expected.
@@ -125,20 +162,50 @@ class HybridDict(dict):
 
     def load(self, key):
         """
-        Load an item **to memory space**.
+        Load an array item to memory space (numpy array).
 
-        This is not equilvant to ``dict.get(key)``.
+        This is not equilvant to ``dict.get(key)``. For non-array objects, this function
+        is meaningless.
+
+        Main purpose of this function is to give a unified function interface to obtain
+        numpy array from either numpy, hdf5 or other types of arrays.
 
         Parameters
         ----------
-        key
+        key : str
             Key of this item
 
         Returns
         -------
-        A numpy object
+        np.ndarray
         """
         return np.asarray(self.get(key))
+
+    def apply_func(self, func: callable) -> dict:
+        types = {}
+        for key, val in self.items():
+            types[key] = func(val)
+        return types
+
+    @staticmethod
+    def get_dataset_keys(f):
+        """
+        Get h5py dataset keys to the bottom level.
+
+        https://stackoverflow.com/a/65924963/7740992
+
+        Parameters
+        ----------
+        f : h5py.File
+            Instance of h5py file.
+
+        Returns
+        -------
+        List[str]
+        """
+        keys = []
+        f.visit(lambda key: keys.append(key) if isinstance(f[key], h5py.Dataset) else None)
+        return keys
 
     def dump(self, h5_path="tensors.h5", dat_path="tensors.dat"):
         """
@@ -148,9 +215,9 @@ class HybridDict(dict):
 
         Parameters
         ----------
-        h5_path
+        h5_path : str
             h5py data path, involving copy operation
-        dat_path
+        dat_path : str
             non-h5py data path, dumped by pickle
         """
         dct = {}
@@ -167,29 +234,24 @@ class HybridDict(dict):
             self[key] = self.chkfile[key]
 
     @staticmethod
-    def get_dataset_keys(f):
-        # get h5py dataset keys to the bottom level https://stackoverflow.com/a/65924963/7740992
-        keys = []
-        f.visit(lambda key: keys.append(key) if isinstance(f[key], h5py.Dataset) else None)
-        return keys
-
-    @staticmethod
-    def pick(h5_path, dat_path):
+    def pick(h5_path="tensors.h5", dat_path="tensors.dat", **kwargs):
         """
         Load dictionary from disk.
 
+        Additional kwargs are passed to constructor of ``HybridDict``.
+
         Parameters
         ----------
-        h5_path
+        h5_path : str
             h5py data path
-        dat_path
+        dat_path : str
             non-h5py data path
 
         Returns
         -------
-        Retrived dictionary.
+        HybridDict
         """
-        tensors = HybridDict()
+        tensors = HybridDict(**kwargs)
         tensors.chkfile.close()
         file_name = tensors.chkfile_name
         os.remove(file_name)
@@ -205,76 +267,48 @@ class HybridDict(dict):
         return tensors
 
 
-@dataclasses.dataclass
+@dataclass
 class Params:
+    """
+    Parameters and data
+
+    This class hope programmers adopting variable protection.
+    See documentation for developer.
+    """
     flags: dict
+    """
+    Flags stored by dictionary. Suggests to be composed by simple types such as
+    booleans, integers and strings. Should be serializable by pickle.
+    """
     tensors: HybridDict
+    """
+    Intermediate tensors. Large tensors are supposed to be written into this dictionary.
+    Should be serializable.
+    """
     results: dict
+    """
+    Computed results stored by dictionary. Should be serializable.
+    """
 
     def __iter__(self):
         yield from [self.flags, self.tensors, self.results]
 
-    @property
-    def temporary_add_flag(self):
-        orig_params = self
+    @contextmanager
+    def temporary_flags(self, add_flags):
+        """
+        Temporarily additional flags.
 
-        class ParamsTmp:
-            def __init__(self, add_flags):
-                self.orig_flags = orig_params.flags.copy()
-                self.add_flags = add_flags
+        Use this function by with expression::
 
-            def __enter__(self):
-                orig_params.flags.update(self.add_flags)
-                return orig_params
+            with params.temporary_flags({"key": value}):
+                print(params.flags)
 
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                orig_params.flags = self.orig_flags
-
-        return ParamsTmp
-
-
-def calc_batch_size(unit_flop, mem_avail, pre_flop=0):
-    # mem_avail: in MB
-    if unit_flop == 0: return 1
-    max_memory = 0.8 * mem_avail - pre_flop * 8 / 1024 ** 2
-    batch_size = int(max(max_memory // (unit_flop * 8 / 1024 ** 2), 1))
-    return batch_size
-
-
-def get_cderi_mo(with_df: df.DF, C, Y_mo=None, pqslice=None, max_memory=2000):
-    naux = with_df.get_naoaux()
-    nmo = C.shape[-1]
-    if pqslice is None:
-        pqslice = (0, nmo, 0, nmo)
-        nump, numq = nmo, nmo
-    else:
-        nump, numq = pqslice[1] - pqslice[0], pqslice[3] - pqslice[2]
-    if Y_mo is None:
-        Y_mo = np.empty((naux, nump, numq))
-
-    p0, p1 = 0, 0
-    preflop = 0 if not isinstance(Y_mo, np.ndarray) else Y_mo.size
-    nbatch = calc_batch_size(2*nump*numq, max_memory, preflop)
-    for Y_ao in with_df.loop(nbatch):
-        p1 = p0 + Y_ao.shape[0]
-        Y_mo[p0:p1] = _ao2mo.nr_e2(Y_ao, C, pqslice, aosym="s2", mosym="s1").reshape(p1-p0, nump, numq)
-        p0 = p1
-    return Y_mo
-
-
-def gen_leggauss_0_inf(ngrid):
-    x, w = np.polynomial.legendre.leggauss(ngrid)
-    return 0.5 * (1 + x) / (1 - x), w / (1 - x)**2
-
-
-def gen_leggauss_0_1(ngrid):
-    x, w = np.polynomial.legendre.leggauss(ngrid)
-    return 0.5 * (x + 1), 0.5 * w
-
-
-if __name__ == '__main__':
-    params = Params({}, HybridDict(), {})
-    with params.temporary_add_flag({"Add": 1}) as p:
-        print(p.flags)
-        print(params.flags)
-    print(params.flags)
+        Parameters
+        ----------
+        add_flags : dict
+            Temporarily changed flags
+        """
+        old_flags = self.flags.copy()
+        self.flags.update(add_flags)
+        yield self
+        self.flags = old_flags

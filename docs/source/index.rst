@@ -8,6 +8,14 @@ Welcome to dh's documentation!
 
 .. toctree::
    :maxdepth: 1
+   :caption: Programmer Documentation
+
+   programmer/usage_params.ipynb
+   programmer/usage_hybriddict.ipynb
+   programmer/programmer_additional.md
+
+.. toctree::
+   :maxdepth: 1
    :caption: API Document
 
    api.rst

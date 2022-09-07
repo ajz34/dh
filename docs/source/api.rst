@@ -3,4 +3,4 @@
    :template: custom-module-template.rst
    :recursive:
 
-   pyscf.dh.util
+   pyscf.dh
