@@ -1,9 +1,9 @@
 {{ fullname | escape | underline}}
 
 .. automodule:: {{ fullname }}
-
    {% block classes %}
    {% if classes %}
+   {% if objname not in ["options"] %}
    .. rubric:: {{ _('Classes') }}
 
    .. autosummary::
@@ -12,7 +12,18 @@
       :nosignatures:
    {% for item in classes %}
       {{ item }}
-   {%- endfor %}
+   {% endfor %}
+   {% else %}
+   .. rubric:: {{ _('Classes') }}
+
+   .. autosummary::
+      :template: custom-class-template.rst
+      :nosignatures:
+   {% for item in classes %}
+      {{ item }}
+   {% endfor %}
+
+   {% endif %}
    {% endif %}
    {% endblock %}
 
@@ -21,11 +32,11 @@
    .. rubric:: Module Attributes
 
    .. autosummary::
-      :toctree: .
       :nosignatures:
    {% for item in attributes %}
       {{ item }}
    {%- endfor %}
+
    {% endif %}
    {% endblock %}
 
@@ -34,26 +45,38 @@
    .. rubric:: {{ _('Functions') }}
 
    .. autosummary::
-      :toctree: .
       :nosignatures:
    {% for item in functions %}
       ~{{ item }}
    {%- endfor %}
+
    {% endif %}
    {% endblock %}
 
-   {% block exceptions %}
-   {% if exceptions %}
-   .. rubric:: {{ _('Exceptions') }}
+   {% if objname in ["options"] %}
+   {% if classes %}
+   .. rubric:: Details of Classes
+   {% for item in classes %}
+   .. autoclass:: {{ item }}
+     :members:
+     :show-inheritance:
+   {% endfor %}
+   {% endif %}
+   {% endif %}
 
-   .. autosummary::
-      :toctree: .
-      :nosignatures:
-   {% for item in exceptions %}
-      {{ item }}
+   {% if attributes %}
+   .. rubric:: Details of Attributes
+   {% for item in attributes %}
+   .. autodata:: {{ item }}
    {%- endfor %}
    {% endif %}
-   {% endblock %}
+
+   {% if functions %}
+   .. rubric:: Details of Functions
+   {% for item in functions %}
+   .. autofunction:: {{ item }}
+   {%- endfor %}
+   {% endif %}
 
 {% block modules %}
 {% if modules %}

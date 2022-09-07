@@ -17,8 +17,8 @@ class RestrictedDataset(h5py.Dataset):
     This inheritance aquire that h5py data is only writable when
     ``self.attrs["writeable"]`` is set to True.
 
-    Note
-    ----
+    Notes
+    -----
     This implementation requires direct modification to ``h5py._hl.dataset``.
     If other programs uses ``h5py.File.create_dataset``, they may actually
     uses this ``RestrictedDataset`` class.
@@ -52,8 +52,8 @@ class HybridDict(dict):
     pathdir : str
         File directory for HDF5 data
 
-    Note
-    ----
+    Notes
+    -----
     This class is inherited from ``dict``, and you surely could store objects other than numpy or h5py tensors.
 
     But for those objects, you may not utilize the following attribute functions.
@@ -144,8 +144,8 @@ class HybridDict(dict):
         key : str
             Key of this item
 
-        Note
-        ----
+        Notes
+        -----
         If the item to be deleted is an h5py dataset, then the data on disk will also be deleted.
         However, h5py may not handle deleting an item delicately, meaning that deleted item does
         not necessarily (usually not) free the space you may expected.
@@ -181,7 +181,23 @@ class HybridDict(dict):
         """
         return np.asarray(self.get(key))
 
-    def apply_func(self, func: callable) -> dict:
+    def apply_func(self, func):
+        """
+        Apply functin to all values in dictionary.
+
+        As an example, to give types of every item entry of current HybridDict object::
+
+            tensors.apply_func(type)
+
+        Parameters
+        ----------
+        func : callable
+            Function to be applied.
+
+        Returns
+        -------
+        dict
+        """
         types = {}
         for key, val in self.items():
             types[key] = func(val)
@@ -292,6 +308,26 @@ class Params:
 
     def __iter__(self):
         yield from [self.flags, self.tensors, self.results]
+
+    @contextmanager
+    def fill_default_flag(self, default_flag):
+        """
+        Temporarily fill with default flags.
+
+        User-defined flags will be preserved while flags defined in ``default_flag``
+        but not in current flags will be included.
+        Use this function by with expression.
+
+        Parameters
+        ----------
+        default_flag : dict
+            Default flags to be filled.
+        """
+        old_flags = self.flags.copy()
+        self.flags = default_flag
+        self.flags.update(old_flags)
+        yield self
+        self.flags = old_flags
 
     @contextmanager
     def temporary_flags(self, add_flags):
