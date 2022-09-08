@@ -1,4 +1,4 @@
-import pyscf.dh
+from pyscf import dh
 import pkgutil
 import importlib
 import enum
@@ -19,7 +19,7 @@ def get_default_options_from_module(module):
 
 def get_default_options():
     ops = {}
-    for i in pkgutil.walk_packages(pyscf.dh.__path__, pyscf.dh.__name__ + "."):
+    for i in pkgutil.walk_packages(dh.__path__, dh.__name__ + "."):
         p = importlib.import_module(i.name)
         if p.__name__.split(".")[-1] == "options":
             ops.update(get_default_options_from_module(p))
