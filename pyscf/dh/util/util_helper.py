@@ -1,6 +1,8 @@
 import numpy as np
 import warnings
 
+from typing import List
+
 
 def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=1):
     """ Calculate batch size within possible memory.
@@ -53,6 +55,31 @@ def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=1):
 
     batch_size = int(max(max_mb / unit_mb, unit_mb))
     return batch_size
+
+
+def gen_batch(val_min, val_max, batch_size):
+    """ Generate slices given numbers of batch.
+
+    Parameters
+    ----------
+    val_min : int
+        Minimum value to be iterated
+    val_max : int
+        Maximum value to be iterated
+    batch_size : int
+        Batch size to be sliced.
+
+    Returns
+    -------
+    List[slice]
+
+    Examples
+    --------
+    >>> gen_batch(10, 20, 3)
+        [slice(10, 13, None), slice(13, 16, None), slice(16, 19, None), slice(19, 20, None)]
+    """
+    return [slice(i, (i + batch_size) if i + batch_size < val_max else val_max)
+            for i in range(val_min, val_max, batch_size)]
 
 
 def gen_leggauss_0_inf(ngrid):
