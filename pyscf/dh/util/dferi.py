@@ -1,7 +1,7 @@
 import numpy as np
 from pyscf import df
 from pyscf.ao2mo import _ao2mo
-from pyscf.dh.util.util_helper import calc_batch_size
+from pyscf.dh.util.helper import calc_batch_size
 
 
 def get_cderi_mo(with_df: df.DF, C, Y_mo=None, pqslice=None, max_memory=2000):
