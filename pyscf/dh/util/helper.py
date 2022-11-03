@@ -1,3 +1,5 @@
+import inspect
+
 from pyscf import lib
 import numpy as np
 import warnings
@@ -135,3 +137,60 @@ def restricted_biorthogonalize(t_ijab, cc, c_os, c_ss):
         res *= coef_1
         res += coef_0 * t_ijab
         return res
+
+
+def check_real(var, rtol=1e-5, atol=1e-8):
+    """ Check and return array or complex number is real.
+
+    Parameters
+    ----------
+    var : complex or np.ndarray
+        Complex value to be checked.
+    rtol : float
+        Relative error threshold.
+    atol : float
+        Absolute error threshold.
+
+    Returns
+    -------
+    complex or np.ndarray
+    """
+    if not np.allclose(np.real(var), var, rtol=rtol, atol=atol):
+        caller_locals = inspect.currentframe().f_back.f_locals
+        for key, val in caller_locals.items():
+            if id(var) == id(val):
+                raise ValueError("Variable `{:}` is not real.".format(key))
+    else:
+        return np.real(var)
+
+
+def sanity_dimension(array, shape, weak=False):
+    """ Sanity check for array dimension.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        The data to be checked. Should have attribute ``shape``.
+    shape : tuple[int]
+        Shape of data to be checked.
+    weak : bool
+        If weak, then only check size of array; otherwise, check dimension
+        shape. Default to False.
+    """
+    caller_locals = inspect.currentframe().f_back.f_locals
+    for key, val in caller_locals.items():
+        if id(array) == id(val):
+            if not weak:
+                if array.shape != shape:
+                    raise ValueError(
+                        "Dimension sanity check: {:} is not {:}"
+                        .format(key, shape))
+            else:
+                if np.prod(array.shape) != np.prod(shape):
+                    pass
+                raise ValueError(
+                    "Dimension sanity check: Size of {:} is not {:}"
+                    .format(np.prod(array.shape), np.prod(array.shape)))
+            return
+    raise ValueError("Array in dimension sanity check does not included in "
+                     "upper caller function.")

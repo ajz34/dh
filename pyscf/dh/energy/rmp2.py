@@ -1,9 +1,7 @@
-from pyscf.dh.util import Params
+from pyscf.dh import util
 
 from pyscf import ao2mo, lib
 import numpy as np
-
-from pyscf.dh.util import sanity_dimension
 import typing
 
 if typing.TYPE_CHECKING:
@@ -122,17 +120,17 @@ def kernel_energy_mp2_conv_full_incore(
 
     # Dimensions
     nvir = nmo - nocc
-    sanity_dimension(mo_energy, (nmo, ), locals())
-    sanity_dimension(mo_coeff, (nao, nmo), locals())
+    util.sanity_dimension(mo_energy, (nmo, ))
+    util.sanity_dimension(mo_coeff, (nao, nmo))
     if t_ijab:
-        sanity_dimension(t_ijab, (nocc, nocc, nmo, nmo), locals())
+        util.sanity_dimension(t_ijab, (nocc, nocc, nmo, nmo))
     if frac_occ or frac_vir:
         if frac_occ:
-            sanity_dimension(frac_occ, (nocc,), locals())
+            util.sanity_dimension(frac_occ, (nocc,))
         else:
             frac_occ = np.ones(nocc)
         if frac_vir:
-            sanity_dimension(frac_vir, (nvir,), locals())
+            util.sanity_dimension(frac_vir, (nvir,))
         else:
             frac_vir = np.zeros(nvir)
 
@@ -156,12 +154,14 @@ def kernel_energy_mp2_conv_full_incore(
         if frac_occ or frac_vir:
             n_Ijab = frac_occ[i] * frac_occ[:, None, None] \
                 * (1 - frac_vir[None, :, None]) * (1 - frac_vir[None, None, :])
-            eng_bi1 += lib.einsum("jab, jab, ajb ->", n_Ijab, t_Ijab, g_Iajb)
-            eng_bi2 += lib.einsum("jab, jab, bja ->", n_Ijab, t_Ijab, g_Iajb)
+            eng_bi1 += lib.einsum("jab, jab, ajb ->", n_Ijab, t_Ijab.conj(), g_Iajb)
+            eng_bi2 += lib.einsum("jab, jab, bja ->", n_Ijab, t_Ijab.conj(), g_Iajb)
         else:
-            eng_bi1 += lib.einsum("jab, ajb ->", t_Ijab, g_Iajb)
-            eng_bi2 += lib.einsum("jab, bja ->", t_Ijab, g_Iajb)
-
+            eng_bi1 += lib.einsum("jab, ajb ->", t_Ijab.conj(), g_Iajb)
+            eng_bi2 += lib.einsum("jab, bja ->", t_Ijab.conj(), g_Iajb)
+    eng_bi1 = util.check_real(eng_bi1)
+    eng_bi2 = util.check_real(eng_bi2)
+    log.debug1("MP2 energy computation finished.")
     # report
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2
