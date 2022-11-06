@@ -14,6 +14,7 @@ File structure
 
 - 2nd Layer: Code with PySCF involvement but minimum involvement of 1st Layer
 
+  - ``helper_pyscf.py``: Simple helper functions that requires PySCF.
   - ``dferi.py``: Helper additional functions for density fitting
 """
 
@@ -22,3 +23,4 @@ from .helper import calc_batch_size, gen_leggauss_0_1, gen_leggauss_0_inf, restr
     sanity_dimension, check_real
 from .dferi import get_cderi_mo
 from .interface import default_options
+from .helper_pyscf import parse_frozen_numbers, parse_frozen_list

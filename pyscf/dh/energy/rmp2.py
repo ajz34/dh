@@ -27,33 +27,44 @@ def driver_energy_mp2(mf):
 
     This function does not make checks, such as SCF convergence.
     """
+    mol = mf.mf_s.mol
     mo_energy = mf.mf_s.mo_energy
     mo_coeff = mf.mf_s.mo_coeff
     nao, nmo = mo_coeff.shape
     nocc = mf.mf_s.mol.nelectron // 2
+    nvir = nmo - nocc
     c_c = mf.params.flags["coef_mp2"]
     c_os = mf.params.flags["coef_mp2_os"]
     c_ss = mf.params.flags["coef_mp2_ss"]
-    frac_occ = mf.params.flags["frac_occ"]
-    frac_vir = mf.params.flags["frac_vir"]
+    frac_num = mf.params.flags["frac_num"]
+    # parse frozen orbitals
+    frozen_rule = mf.params.flags["frozen_rule"]
+    frozen_list = mf.params.flags["frozen_list"]
+    frozen_orb, frozen_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
+    nmo_f = len(frozen_act)
+    nocc_f = (frozen_act < nocc).sum()
+    nvir_f = nmo_f - nocc_f
+    mo_coeff_f = mo_coeff[:, frozen_act]
+    mo_energy_f = mo_energy[frozen_act]
+    frac_num_f = frac_num[frozen_act] if frac_num else None
+    # MP2 kernels
     if mf.params.flags["integral_scheme"].lower() == "conv":
         ao_eri = mf.mf_s._eri
         kernel_energy_mp2_conv_full_incore(
-            mo_energy, mo_coeff, ao_eri, nao, nocc, nmo,
+            mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
             None, mf.params.results,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
-            frac_occ=frac_occ, frac_vir=frac_vir,
+            frac_num=frac_num_f,
             verbose=mf.verbose)
     else:
         raise NotImplementedError("Not implemented currently!")
 
 
 def kernel_energy_mp2_conv_full_incore(
-        mo_energy, mo_coeff, ao_eri, nao, nocc, nmo,
+        mo_energy, mo_coeff, ao_eri,
+        nocc, nvir,
         t_ijab, results,
-        c_c=1., c_os=1., c_ss=1.,
-        frac_occ=None, frac_vir=None,
-        verbose=None):
+        c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None):
     """ Kernel of MP2 energy by conventional method.
 
     .. math::
@@ -80,16 +91,13 @@ def kernel_energy_mp2_conv_full_incore(
     ao_eri : np.ndarray
         ERI that is recognized by ``pyscf.ao2mo.general``.
 
-    nao : int
-        Number of atomic orbitals (basis sets).
     nocc : int
         Number of occupied orbitals.
-    nmo : int
-        Number of molecular orbitals.
+    nvir : int
+        Number of virtual orbitals.
 
     t_ijab : np.ndarray or None
-        (output) Amplitude of MP2. If None, this variable is not to
-        be generated.
+        (output) Amplitude of MP2. If None, this variable is not to be generated.
     results : dict
         (output) Result dictionary of Params.
 
@@ -99,10 +107,8 @@ def kernel_energy_mp2_conv_full_incore(
         MP2 opposite-spin contribution coefficient.
     c_ss : float
         MP2 same-spin contribution coefficient.
-    frac_occ : np.ndarray
-        Fractional occupation number for occupied orbitals.
-    frac_vir : np.ndarray
-        Fractional occupation number for virtual orbitals.
+    frac_num : np.ndarray
+        Fractional occupation number list.
     verbose : int
         Verbose level for PySCF.
 
@@ -118,21 +124,10 @@ def kernel_energy_mp2_conv_full_incore(
     log.warn("Conventional integral of MP2 is not recommended!\n"
              "Use density fitting approximation is recommended.")
 
-    # Dimensions
-    nvir = nmo - nocc
-    util.sanity_dimension(mo_energy, (nmo, ))
-    util.sanity_dimension(mo_coeff, (nao, nmo))
-    if t_ijab:
-        util.sanity_dimension(t_ijab, (nocc, nocc, nmo, nmo))
-    if frac_occ or frac_vir:
-        if frac_occ:
-            util.sanity_dimension(frac_occ, (nocc,))
-        else:
-            frac_occ = np.ones(nocc)
-        if frac_vir:
-            util.sanity_dimension(frac_vir, (nvir,))
-        else:
-            frac_vir = np.zeros(nvir)
+    if frac_num:
+        frac_occ, frac_vir = frac_num[:nocc], frac_num[nocc:]
+    else:
+        frac_occ = frac_vir = None
 
     # ERI conversion
     Co = mo_coeff[:, :nocc]
@@ -151,7 +146,7 @@ def kernel_energy_mp2_conv_full_incore(
         t_Ijab = lib.einsum("ajb, jab -> jab", g_Iajb, 1 / D_Ijab)
         if t_ijab:
             t_ijab[i] = t_Ijab
-        if frac_occ or frac_vir:
+        if frac_num:
             n_Ijab = frac_occ[i] * frac_occ[:, None, None] \
                 * (1 - frac_vir[None, :, None]) * (1 - frac_vir[None, None, :])
             eng_bi1 += lib.einsum("jab, jab, ajb ->", n_Ijab, t_Ijab.conj(), g_Iajb)

@@ -15,9 +15,25 @@ frozen_rule = None
 
 This option will be generate and be overrided by option ``frozen_list``.
 
+Parameters
+----------
+PySCF
+    Rule from ``pyscf.data.elements.chemcore_atm``.
+FreezeNobleGasCore
+    Freeze largest noble gas core, which is default of G16 for non-6-31G-basis.
+FreezeInnerNobleGasCore
+    Freeze orbitals that next to largest noble gas core.
+SmallCore
+    Small frozen core from [1]_.
+LargeCore
+    Large frozen core from [1]_. This may also be the same to FreezeG2 in G16.
+
 Warnings
 --------
 TODO: Function to parse frozen rule.
+
+.. [1] Rassolov, Vitaly A, John A Pople, Paul C Redfern, and Larry A Curtiss. “The Definition of Core Electrons.”
+       Chem. Phys. Lett. 350, (5–6), 573–76. https://doi.org/10.1016/S0009-2614(01)01345-8.
 """
 
 frozen_list = None
@@ -26,16 +42,10 @@ frozen_list = None
 For example, if set to ``[0, 2, 3, 4]``, then those orbitals are not correlated in MP2 calculation.
 """
 
-frac_occ = None
-""" Fraction occupation number for occupied orbitals.
+frac_num = None
+""" Fraction occupation number list.
 
-Should be list of floats.
-"""
-
-frac_vir = None
-""" Fraction occupation number for virtual orbitals.
-
-Should be list of floats.
+Should be list of floats, size as ``(nmo, )``.
 """
 
 # endregion
