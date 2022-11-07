@@ -56,6 +56,15 @@ def driver_energy_mp2(mf):
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf.verbose)
+    elif mf.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
+        Y_ov_f = util.get_cderi_mo(mf.df_ri, mo_coeff, None, (0, nocc_f, nocc_f, nmo_f),
+                                   mol.max_memory - lib.current_memory()[0])
+        kernel_energy_mp2_ri(
+            mo_energy_f, Y_ov_f, None, mf.params.results,
+            c_c=c_c, c_os=c_os, c_ss=c_ss,
+            frac_num=frac_num_f,
+            verbose=mf.verbose,
+            max_memory=mol.max_memory - lib.current_memory()[0])
     else:
         raise NotImplementedError("Not implemented currently!")
 
@@ -154,6 +163,103 @@ def kernel_energy_mp2_conv_full_incore(
         else:
             eng_bi1 += lib.einsum("jab, ajb ->", t_Ijab.conj(), g_Iajb)
             eng_bi2 += lib.einsum("jab, bja ->", t_Ijab.conj(), g_Iajb)
+    eng_bi1 = util.check_real(eng_bi1)
+    eng_bi2 = util.check_real(eng_bi2)
+    log.debug1("MP2 energy computation finished.")
+    # report
+    eng_os = eng_bi1
+    eng_ss = eng_bi1 - eng_bi2
+    eng_mp2 = c_c * (c_os * eng_os + c_ss * eng_ss)
+    results["eng_os"] = eng_os
+    results["eng_ss"] = eng_ss
+    results["eng_mp2"] = eng_mp2
+
+
+def kernel_energy_mp2_ri(
+        mo_energy, Y_ov,
+        t_ijab, results,
+        c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000):
+    """ Kernel of MP2 energy by RI integral.
+
+    .. math::
+        g_{ij}^{ab} &= (ia|jb) = Y_{ia, P} Y_{jb, P}
+
+        D_{ij}^{ab} &= \\varepsilon_i + \\varepsilon_j - \\varepsilon_a - \\varepsilon_b
+
+        t_{ij}^{ab} &= g_{ij}^{ab} / D_{ij}^{ab}
+
+        n_{ij}^{ab} &= n_i n_j (1 - n_a) (1 - n_b)
+
+        E_\\mathrm{OS} &= n_{ij}^{ab} t_{ij}^{ab} g_{ij}^{ab}
+
+        E_\\mathrm{SS} &= n_{ij}^{ab} t_{ij}^{ab} (g_{ij}^{ab} - g_{ij}^{ba})
+
+        E_\\mathrm{corr,MP2} &= c_\\mathrm{c} (c_\\mathrm{OS} E_\\mathrm{OS} + c_\\mathrm{SS} E_\\mathrm{SS})
+
+    Parameters
+    ----------
+    mo_energy : np.ndarray
+        Molecular orbital energy levels.
+    Y_ov : np.ndarray
+        Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
+
+    t_ijab : np.ndarray or None
+        (output) Amplitude of MP2. If None, this variable is not to be generated.
+    results : dict
+        (output) Result dictionary of Params.
+
+    c_c : float
+        MP2 contribution coefficient.
+    c_os : float
+        MP2 opposite-spin contribution coefficient.
+    c_ss : float
+        MP2 same-spin contribution coefficient.
+    frac_num : np.ndarray
+        Fractional occupation number list.
+    verbose : int
+        Verbose level for PySCF.
+    max_memory : float
+        Allocatable memory in MB.
+
+    Notes
+    -----
+    For energy of fractional occupation system, computation method is chosen
+    by eq (7) from Su2016 (10.1021/acs.jctc.6b00197).
+
+    Since conventional integral of MP2 is computationally costly,
+    purpose of this function should only be benchmark.
+    """
+    log = lib.logger.new_logger(verbose=verbose)
+    log.warn("Conventional integral of MP2 is not recommended!\n"
+             "Use density fitting approximation is recommended.")
+
+    naux, nocc, nvir = Y_ov.shape
+    if frac_num:
+        frac_occ, frac_vir = frac_num[:nocc], frac_num[nocc:]
+    else:
+        frac_occ = frac_vir = None
+    eo = mo_energy[:nocc]
+    ev = mo_energy[nocc:]
+
+    # loops
+    log.debug1("Start RI-MP2 loop")
+    nbatch = util.calc_batch_size(4 * nocc * nvir ** 2, max_memory, dtype=Y_ov.dtype)
+    eng_bi1 = eng_bi2 = 0
+    for sI in util.gen_batch(0, nocc, nbatch):
+        log.debug1("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
+        g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov)
+        D_Ijab = eo[sI, None, None, None] + eo[None, :, None, None] - ev[None, None, :, None] - ev[None, None, None, :]
+        t_Ijab = lib.einsum("Iajb, Ijab -> Ijab", g_Iajb, 1 / D_Ijab)
+        if t_ijab:
+            t_ijab[sI] = t_Ijab
+        if frac_num:
+            n_Ijab = frac_occ[sI] * frac_occ[None, :, None, None] \
+                * (1 - frac_vir[None, None, :, None]) * (1 - frac_vir[None, None, None, :])
+            eng_bi1 += lib.einsum("Ijab, Ijab, Iajb ->", n_Ijab, t_Ijab.conj(), g_Iajb)
+            eng_bi2 += lib.einsum("Ijab, Ijab, Ibja ->", n_Ijab, t_Ijab.conj(), g_Iajb)
+        else:
+            eng_bi1 += lib.einsum("Ijab, Iajb ->", t_Ijab.conj(), g_Iajb)
+            eng_bi2 += lib.einsum("Ijab, Ibja ->", t_Ijab.conj(), g_Iajb)
     eng_bi1 = util.check_real(eng_bi1)
     eng_bi2 = util.check_real(eng_bi2)
     log.debug1("MP2 energy computation finished.")

@@ -1,4 +1,4 @@
-from pyscf import dh, gto, scf
+from pyscf import dh, gto, scf, df
 from pyscf.dh.util import Params, HybridDict, default_options
 import numpy as np
 
@@ -66,5 +66,18 @@ def test_rmp2_conv_giao():
         mf.driver_energy_mp2()
     print(mf.params.results)
     assert np.allclose(mf.params.results["eng_mp2"], -0.12862913348211558)
+
+
+def test_rmp2_ri():
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVDZ").build()
+    mf_s = scf.RHF(mol).run()
+
+    mf = dh.energy.RDH(mf_s)
+    mf.df_ri = df.DF(mol, df.aug_etb(mol))
+    mf.params = Params(default_options, HybridDict(), {})
+    with mf.params.temporary_flags({"integral_scheme": "ri"}):
+        mf.driver_energy_mp2()
+    print(mf.params.results)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.2027741212625066)
 
 

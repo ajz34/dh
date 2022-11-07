@@ -19,8 +19,9 @@ File structure
 """
 
 from .general import HybridDict, Params
-from .helper import calc_batch_size, gen_leggauss_0_1, gen_leggauss_0_inf, restricted_biorthogonalize, \
+from .helper import calc_batch_size, gen_batch, gen_leggauss_0_1, gen_leggauss_0_inf, restricted_biorthogonalize, \
     sanity_dimension, check_real
 from .dferi import get_cderi_mo
 from .interface import default_options
+
 from .helper_pyscf import parse_frozen_numbers, parse_frozen_list

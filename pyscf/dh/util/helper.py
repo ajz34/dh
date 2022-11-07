@@ -25,7 +25,7 @@ def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=1):
         with ``unit_flop = 15600``.
 
         This value will be set to 1 if too small.
-    mem_avail : int
+    mem_avail : float
         Memory available in MB.
     pre_flop : int
         Number of data preserved in memory. Unit in number.
