@@ -1,10 +1,10 @@
-from pyscf import dh, gto, scf, df
+from pyscf import dh, gto, scf, df, mp
 from pyscf.dh.util import Params, HybridDict, default_options
 import numpy as np
 
 
 def test_rmp2_conv():
-    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="6-31G").build()
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
     mf_s = scf.RHF(mol).run()
 
     mf = dh.energy.RDH(mf_s)
@@ -12,11 +12,11 @@ def test_rmp2_conv():
     with mf.params.temporary_flags({"integral_scheme": "conv"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
-    assert np.allclose(mf.params.results["eng_mp2"], -0.12722216721906485)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.273944755130888)
 
 
 def test_rmp2_conv_fc():
-    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVDZ").build()
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
     mf_s = scf.RHF(mol).run()
 
     mf = dh.energy.RDH(mf_s)
@@ -25,13 +25,11 @@ def test_rmp2_conv_fc():
     with mf.params.temporary_flags({"integral_scheme": "conv"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
-    assert np.allclose(mf.params.results["eng_mp2"], -0.2004088295118168)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.2602324295391498)
 
 
 def test_rmp2_conv_giao():
-    from pyscf import mp
-
-    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="6-31G").build()
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
 
     hcore_1_B = - 1j * (
         + 0.5 * mol.intor('int1e_giao_irjxp', 3)
@@ -43,7 +41,7 @@ def test_rmp2_conv_giao():
         + np.einsum("tkluv -> tuvkl", mol.intor('int2e_ig1')))
 
     mf_s = scf.RHF(mol)
-    dev_xyz_B = np.array([1e-1, 2e-1, -1e-1])
+    dev_xyz_B = np.array([1e-2, 2e-2, -1e-2])
 
     def get_hcore(mol_=mol):
         hcore_total = np.asarray(scf.rhf.get_hcore(mol_), dtype=np.complex128)
@@ -65,11 +63,11 @@ def test_rmp2_conv_giao():
     with mf.params.temporary_flags({"integral_scheme": "conv"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
-    assert np.allclose(mf.params.results["eng_mp2"], -0.12862913348211558)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.27425584824874516)
 
 
 def test_rmp2_ri():
-    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVDZ").build()
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
     mf_s = scf.RHF(mol).run()
 
     mf = dh.energy.RDH(mf_s)
@@ -78,6 +76,19 @@ def test_rmp2_ri():
     with mf.params.temporary_flags({"integral_scheme": "ri"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
-    assert np.allclose(mf.params.results["eng_mp2"], -0.2027741212625066)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.27393741308994124)
 
+
+def test_rmp2_ri_fc():
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
+    mf_s = scf.RHF(mol).run()
+
+    mf = dh.energy.RDH(mf_s)
+    mf.df_ri = df.DF(mol, df.aug_etb(mol))
+    mf.params = Params(default_options, HybridDict(), {})
+    mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
+    with mf.params.temporary_flags({"integral_scheme": "ri"}):
+        mf.driver_energy_mp2()
+    print(mf.params.results)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.2602250917785774)
 

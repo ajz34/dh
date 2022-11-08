@@ -57,7 +57,7 @@ def driver_energy_mp2(mf):
             frac_num=frac_num_f,
             verbose=mf.verbose)
     elif mf.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
-        Y_ov_f = util.get_cderi_mo(mf.df_ri, mo_coeff, None, (0, nocc_f, nocc_f, nmo_f),
+        Y_ov_f = util.get_cderi_mo(mf.df_ri, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                    mol.max_memory - lib.current_memory()[0])
         kernel_energy_mp2_ri(
             mo_energy_f, Y_ov_f, None, mf.params.results,
