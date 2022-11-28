@@ -59,12 +59,17 @@ def driver_energy_mp2(mf):
     elif mf.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
         Y_ov_f = util.get_cderi_mo(mf.df_ri, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                    mol.max_memory - lib.current_memory()[0])
+        Y_ov_2_f = None
+        if mf.df_ri_2:
+            Y_ov_2_f = util.get_cderi_mo(mf.df_ri_2, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
+                                         mol.max_memory - lib.current_memory()[0])
         kernel_energy_mp2_ri(
             mo_energy_f, Y_ov_f, None, mf.params.results,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf.verbose,
-            max_memory=mol.max_memory - lib.current_memory()[0])
+            max_memory=mol.max_memory - lib.current_memory()[0],
+            Y_ov_2=Y_ov_2_f)
     else:
         raise NotImplementedError("Not implemented currently!")
 
@@ -178,7 +183,7 @@ def kernel_energy_mp2_conv_full_incore(
 def kernel_energy_mp2_ri(
         mo_energy, Y_ov,
         t_ijab, results,
-        c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000):
+        c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
     """ Kernel of MP2 energy by RI integral.
 
     .. math::
@@ -220,6 +225,8 @@ def kernel_energy_mp2_ri(
         Verbose level for PySCF.
     max_memory : float
         Allocatable memory in MB.
+    Y_ov_2 : np.ndarray
+        Another part of 3c2e ERI in MO basis (occ-vir part). This is mostly used in magnetic computations.
 
     Notes
     -----
@@ -247,7 +254,11 @@ def kernel_energy_mp2_ri(
     eng_bi1 = eng_bi2 = 0
     for sI in util.gen_batch(0, nocc, nbatch):
         log.debug1("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
-        g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov)
+        if Y_ov_2 is None:
+            g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov)
+        else:
+            g_Iajb = 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov_2)
+            g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov_2[:, sI], Y_ov)
         D_Ijab = eo[sI, None, None, None] + eo[None, :, None, None] - ev[None, None, :, None] - ev[None, None, None, :]
         t_Ijab = lib.einsum("Iajb, Ijab -> Ijab", g_Iajb, 1 / D_Ijab)
         if t_ijab:
