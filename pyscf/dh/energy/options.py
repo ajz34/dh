@@ -52,7 +52,7 @@ Should be list of floats, size as ``(nmo, )``.
 
 # region Process control
 
-incore_t_ijab = "auto"
+incore_t_ijab = None
 """ Flag for tensor :math:`t_{ij}^{ab}` stored in memory or disk.
 
 Parameters
@@ -66,7 +66,7 @@ None
 "auto"
     Leave program to judge whether tensor locates.
 (int)
-    If tensor size exceeds this size (in MBytes), then store in disk. 
+    If tensor size exceeds this size (in MBytes), then store in disk.
 """
 
 integral_scheme = "ri"

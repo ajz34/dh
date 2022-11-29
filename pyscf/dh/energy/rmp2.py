@@ -32,7 +32,6 @@ def driver_energy_mp2(mf):
     mo_coeff = mf.mf_s.mo_coeff
     nao, nmo = mo_coeff.shape
     nocc = mf.mf_s.mol.nelectron // 2
-    nvir = nmo - nocc
     c_c = mf.params.flags["coef_mp2"]
     c_os = mf.params.flags["coef_mp2_os"]
     c_ss = mf.params.flags["coef_mp2_ss"]
@@ -47,12 +46,21 @@ def driver_energy_mp2(mf):
     mo_coeff_f = mo_coeff[:, frozen_act]
     mo_energy_f = mo_energy[frozen_act]
     frac_num_f = frac_num[frozen_act] if frac_num else None
+    # prepare t_ijab space
+    incore_t_ijab = util.parse_incore_flag(
+        mf.params.flags["incore_t_ijab"], nocc_f**2 * nvir_f**2,
+        mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f.dtype)
+    if incore_t_ijab is None:
+        t_ijab = None
+    else:
+        t_ijab = mf.params.tensors.create(
+            "t_ijab", shape=(nocc_f, nocc_f, nvir_f, nvir_f), incore=incore_t_ijab, dtype=mo_coeff.dtype)
     # MP2 kernels
     if mf.params.flags["integral_scheme"].lower() == "conv":
         ao_eri = mf.mf_s._eri
         kernel_energy_mp2_conv_full_incore(
             mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
-            None, mf.params.results,
+            t_ijab, mf.params.results,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf.verbose)
@@ -64,7 +72,7 @@ def driver_energy_mp2(mf):
             Y_ov_2_f = util.get_cderi_mo(mf.df_ri_2, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                          mol.max_memory - lib.current_memory()[0])
         kernel_energy_mp2_ri(
-            mo_energy_f, Y_ov_f, None, mf.params.results,
+            mo_energy_f, Y_ov_f, t_ijab, mf.params.results,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf.verbose,
@@ -158,7 +166,7 @@ def kernel_energy_mp2_conv_full_incore(
         g_Iajb = g_iajb[i]
         D_Ijab = eo[i] + eo[:, None, None] - ev[None, :, None] - ev[None, None, :]
         t_Ijab = lib.einsum("ajb, jab -> jab", g_Iajb, 1 / D_Ijab)
-        if t_ijab:
+        if t_ijab is not None:
             t_ijab[i] = t_Ijab
         if frac_num:
             n_Ijab = frac_occ[i] * frac_occ[:, None, None] \
@@ -261,7 +269,7 @@ def kernel_energy_mp2_ri(
             g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov_2[:, sI], Y_ov)
         D_Ijab = eo[sI, None, None, None] + eo[None, :, None, None] - ev[None, None, :, None] - ev[None, None, None, :]
         t_Ijab = lib.einsum("Iajb, Ijab -> Ijab", g_Iajb, 1 / D_Ijab)
-        if t_ijab:
+        if t_ijab is not None:
             t_ijab[sI] = t_Ijab
         if frac_num:
             n_Ijab = frac_occ[sI] * frac_occ[None, :, None, None] \

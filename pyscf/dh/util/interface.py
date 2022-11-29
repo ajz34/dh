@@ -25,7 +25,7 @@ def get_default_options():
             m = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(m)
             ops.update(get_default_options_from_module(m))
-    return ops
+    return ops.copy()
 
 
 default_options = get_default_options()

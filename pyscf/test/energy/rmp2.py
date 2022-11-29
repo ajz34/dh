@@ -1,5 +1,5 @@
 from pyscf import dh, gto, scf, df, lib
-from pyscf.dh.util import Params, HybridDict, default_options
+from pyscf.dh.util import Params, HybridDict
 import numpy as np
 
 
@@ -8,7 +8,6 @@ def test_rmp2_conv():
     mf_s = scf.RHF(mol).run()
 
     mf = dh.energy.RDH(mf_s)
-    mf.params = Params(default_options, HybridDict(), {})
     with mf.params.temporary_flags({"integral_scheme": "conv"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
@@ -20,7 +19,6 @@ def test_rmp2_conv_fc():
     mf_s = scf.RHF(mol).run()
 
     mf = dh.energy.RDH(mf_s)
-    mf.params = Params(default_options, HybridDict(), {})
     mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
     with mf.params.temporary_flags({"integral_scheme": "conv"}):
         mf.driver_energy_mp2()
@@ -59,7 +57,6 @@ def test_rmp2_conv_giao():
     mf_s.run()
 
     mf = dh.energy.RDH(mf_s)
-    mf.params = Params(default_options, HybridDict(), {})
     with mf.params.temporary_flags({"integral_scheme": "conv"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
@@ -72,7 +69,6 @@ def test_rmp2_ri():
 
     mf = dh.energy.RDH(mf_s)
     mf.df_ri = df.DF(mol, df.aug_etb(mol))
-    mf.params = Params(default_options, HybridDict(), {})
     with mf.params.temporary_flags({"integral_scheme": "ri"}):
         mf.driver_energy_mp2()
     print(mf.params.results)
@@ -85,7 +81,6 @@ def test_rmp2_ri_fc():
 
     mf = dh.energy.RDH(mf_s)
     mf.df_ri = df.DF(mol, df.aug_etb(mol))
-    mf.params = Params(default_options, HybridDict(), {})
     mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
     with mf.params.temporary_flags({"integral_scheme": "ri"}):
         mf.driver_energy_mp2()
@@ -138,7 +133,7 @@ def test_rmp2_ri_giao():
     mf.df_ri_2 = df.DF(mol, df.aug_etb(mol))
     mf.df_ri_2._cderi = int3c2e_2_cd
 
-    with mf.params.temporary_flags({"integral_scheme": "ri"}):
+    with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True}):
         mf.driver_energy_mp2()
     print(mf.params.results)
     assert np.allclose(mf.params.results["eng_mp2"], -0.27424683619063206)

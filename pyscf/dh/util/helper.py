@@ -7,7 +7,7 @@ import warnings
 from typing import List
 
 
-def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=1):
+def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=0):
     """ Calculate batch size within possible memory.
 
     For example, if we want to compute tensor (100, 100, 100), but only 50,000 memory available,
@@ -58,6 +58,53 @@ def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=1):
 
     batch_size = int(max(max_mb / unit_mb, unit_mb))
     return batch_size
+
+
+def parse_incore_flag(flag, unit_flop, mem_avail, pre_flop=0, dtype=float):
+    """ Parse flag of whether tensor can be stored incore.
+
+    ``flop`` in parameters is number of data, not refers to FLOPs.
+
+    Parameters
+    ----------
+    flag : bool or float or None or str
+        Input flag.
+
+        - True: Store tensor in memory.
+        - False: Store tensor in disk.
+        - None: Store tensor nowhere.
+        - "auto": Judge tensor in memory/disk by available memory.
+        - (float): Judge tensor in memory/disk by given value in MB.
+    unit_flop : int
+        Number of data for unit operation.
+
+        For example, for a tensor with shape (110, 120, 130), the 1st dimension is indexable from
+        outer programs, then a unit operation handles 120x130 = 15,600 data. Then we call this function
+        with ``unit_flop = 15600``.
+
+        This value will be set to 1 if too small.
+    mem_avail : float
+        Memory available in MB.
+    pre_flop : int
+        Number of data preserved in memory. Unit in number.
+    dtype : type
+        Type of data. Such as np.float64, complex, etc.
+
+    Returns
+    -------
+    True or False or None
+        Output flag of whether tensor store in memory/disk/nowhere.
+    """
+    if flag in [False, True, None]:
+        return flag
+    if isinstance(flag, str) and flag.lower().strip() == "auto":
+        pass
+    else:  # assert flag is a number
+        mem_avail = float(flag)
+    unit_flop = max(unit_flop, 1)
+    unit_mb = unit_flop * np.dtype(dtype).itemsize / 1024**2
+    max_mb = mem_avail - pre_flop * np.dtype(dtype).itemsize / 1024 ** 2
+    return unit_mb < max_mb
 
 
 def gen_batch(val_min, val_max, batch_size):

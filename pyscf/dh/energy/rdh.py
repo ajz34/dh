@@ -1,5 +1,5 @@
 from pyscf import lib, dft, df
-from pyscf.dh.util import Params, HybridDict, default_options
+from pyscf.dh.util import Params, HybridDict, get_default_options
 from pyscf.dh.energy.rmp2 import driver_energy_mp2
 
 
@@ -24,6 +24,6 @@ class RDH(lib.StreamObject):
         if params:
             self.params = params
         else:
-            self.params = Params(default_options, HybridDict(), {})
+            self.params = Params(get_default_options(), HybridDict(), {})
 
     driver_energy_mp2 = driver_energy_mp2
