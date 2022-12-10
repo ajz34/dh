@@ -1,10 +1,11 @@
 import numpy as np
+from typing import Tuple
 
 from pyscf import gto, data
 import pyscf.data.elements
 
 
-def parse_frozen_numbers(mol, rule=None):
+def parse_frozen_numbers(mol, rule=None) -> Tuple[int, int]:
     """ Parse frozen orbital numbers.
 
     Frozen orbitals are assumed to be paired. Returned frozen orbital numbers are actually half of core electrons.
@@ -155,7 +156,7 @@ def parse_frozen_numbers(mol, rule=None):
         raise ValueError("Type of Freeze rule is not recoginzed!")
 
 
-def parse_frozen_list(mol, nmo=None, frz=None, rule=None):
+def parse_frozen_list(mol, nmo=None, frz=None, rule=None) -> Tuple[np.ndarray, np.ndarray]:
     """ Parse frozen orbital list
 
     Parameters
@@ -171,7 +172,7 @@ def parse_frozen_list(mol, nmo=None, frz=None, rule=None):
 
     Returns
     -------
-    tuple[list[int], list[int]]
+    Tuple[np.ndarray, np.ndarray]
         List of orbitals to be freezed and to be active.
     """
     if nmo is None:

@@ -12,6 +12,21 @@ def driver_energy_mp2(mf):
     """
     Driver of MP2 energy.
 
+    .. math::
+        g_{ij}^{ab} &= (ia|jb) = (\\mu \\nu | \\kappa \\lambda) C_{\\mu i} C_{\\nu a} C_{\\kappa j} C_{\\lambda b}
+
+        D_{ij}^{ab} &= \\varepsilon_i + \\varepsilon_j - \\varepsilon_a - \\varepsilon_b
+
+        t_{ij}^{ab} &= g_{ij}^{ab} / D_{ij}^{ab}
+
+        n_{ij}^{ab} &= n_i n_j (1 - n_a) (1 - n_b)
+
+        E_\\mathrm{OS} &= n_{ij}^{ab} t_{ij}^{ab} g_{ij}^{ab}
+
+        E_\\mathrm{SS} &= n_{ij}^{ab} t_{ij}^{ab} (g_{ij}^{ab} - g_{ij}^{ba})
+
+        E_\\mathrm{corr,MP2} &= c_\\mathrm{c} (c_\\mathrm{OS} E_\\mathrm{OS} + c_\\mathrm{SS} E_\\mathrm{SS})
+
     Parameters
     ----------
     mf : RDH
@@ -27,11 +42,10 @@ def driver_energy_mp2(mf):
 
     This function does not make checks, such as SCF convergence.
     """
-    mol = mf.mf_s.mol
-    mo_energy = mf.mf_s.mo_energy
-    mo_coeff = mf.mf_s.mo_coeff
-    nao, nmo = mo_coeff.shape
-    nocc = mf.mf_s.mol.nelectron // 2
+    mol = mf.mol
+    mo_energy = mf.mo_energy
+    mo_coeff = mf.mo_coeff
+    nao, nmo, nocc = mf.nao, mf.nmo, mf.nocc
     c_c = mf.params.flags["coef_mp2"]
     c_os = mf.params.flags["coef_mp2_os"]
     c_ss = mf.params.flags["coef_mp2_ss"]
@@ -57,7 +71,7 @@ def driver_energy_mp2(mf):
             "t_ijab", shape=(nocc_f, nocc_f, nvir_f, nvir_f), incore=incore_t_ijab, dtype=mo_coeff.dtype)
     # MP2 kernels
     if mf.params.flags["integral_scheme"].lower() == "conv":
-        ao_eri = mf.mf_s._eri
+        ao_eri = mf.mf._eri
         kernel_energy_mp2_conv_full_incore(
             mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
             t_ijab, mf.params.results,
@@ -88,21 +102,6 @@ def kernel_energy_mp2_conv_full_incore(
         t_ijab, results,
         c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None):
     """ Kernel of MP2 energy by conventional method.
-
-    .. math::
-        g_{ij}^{ab} &= (ia|jb) = (\\mu \\nu | \\kappa \\lambda) C_{\\mu i} C_{\\nu a} C_{\\kappa j} C_{\\lambda b}
-
-        D_{ij}^{ab} &= \\varepsilon_i + \\varepsilon_j - \\varepsilon_a - \\varepsilon_b
-
-        t_{ij}^{ab} &= g_{ij}^{ab} / D_{ij}^{ab}
-
-        n_{ij}^{ab} &= n_i n_j (1 - n_a) (1 - n_b)
-
-        E_\\mathrm{OS} &= n_{ij}^{ab} t_{ij}^{ab} g_{ij}^{ab}
-
-        E_\\mathrm{SS} &= n_{ij}^{ab} t_{ij}^{ab} (g_{ij}^{ab} - g_{ij}^{ba})
-
-        E_\\mathrm{corr,MP2} &= c_\\mathrm{c} (c_\\mathrm{OS} E_\\mathrm{OS} + c_\\mathrm{SS} E_\\mathrm{SS})
 
     Parameters
     ----------
@@ -183,6 +182,8 @@ def kernel_energy_mp2_conv_full_incore(
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2
     eng_mp2 = c_c * (c_os * eng_os + c_ss * eng_ss)
+    results["eng_bi1"] = eng_bi1
+    results["eng_bi2"] = eng_bi2
     results["eng_os"] = eng_os
     results["eng_ss"] = eng_ss
     results["eng_mp2"] = eng_mp2
@@ -194,20 +195,10 @@ def kernel_energy_mp2_ri(
         c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
     """ Kernel of MP2 energy by RI integral.
 
+    For RI approximation, ERI integral is set to be
+
     .. math::
         g_{ij}^{ab} &= (ia|jb) = Y_{ia, P} Y_{jb, P}
-
-        D_{ij}^{ab} &= \\varepsilon_i + \\varepsilon_j - \\varepsilon_a - \\varepsilon_b
-
-        t_{ij}^{ab} &= g_{ij}^{ab} / D_{ij}^{ab}
-
-        n_{ij}^{ab} &= n_i n_j (1 - n_a) (1 - n_b)
-
-        E_\\mathrm{OS} &= n_{ij}^{ab} t_{ij}^{ab} g_{ij}^{ab}
-
-        E_\\mathrm{SS} &= n_{ij}^{ab} t_{ij}^{ab} (g_{ij}^{ab} - g_{ij}^{ba})
-
-        E_\\mathrm{corr,MP2} &= c_\\mathrm{c} (c_\\mathrm{OS} E_\\mathrm{OS} + c_\\mathrm{SS} E_\\mathrm{SS})
 
     Parameters
     ----------
@@ -286,6 +277,8 @@ def kernel_energy_mp2_ri(
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2
     eng_mp2 = c_c * (c_os * eng_os + c_ss * eng_ss)
+    results["eng_bi1"] = eng_bi1
+    results["eng_bi2"] = eng_bi2
     results["eng_os"] = eng_os
     results["eng_ss"] = eng_ss
     results["eng_mp2"] = eng_mp2

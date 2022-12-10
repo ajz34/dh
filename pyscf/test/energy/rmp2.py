@@ -1,5 +1,4 @@
 from pyscf import dh, gto, scf, df, lib
-from pyscf.dh.util import Params, HybridDict
 import numpy as np
 
 
