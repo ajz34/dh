@@ -8,9 +8,8 @@ if typing.TYPE_CHECKING:
     from pyscf.dh.energy import RDH
 
 
-def driver_energy_mp2(mf):
-    """
-    Driver of MP2 energy.
+def driver_energy_rmp2(mf):
+    """ Driver of MP2 energy.
 
     .. math::
         g_{ij}^{ab} &= (ia|jb) = (\\mu \\nu | \\kappa \\lambda) C_{\\mu i} C_{\\nu a} C_{\\kappa j} C_{\\lambda b}
@@ -72,7 +71,7 @@ def driver_energy_mp2(mf):
     # MP2 kernels
     if mf.params.flags["integral_scheme"].lower() == "conv":
         ao_eri = mf.mf._eri
-        kernel_energy_mp2_conv_full_incore(
+        kernel_energy_rmp2_conv_full_incore(
             mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
             t_ijab, mf.params.results,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
@@ -85,7 +84,7 @@ def driver_energy_mp2(mf):
         if mf.df_ri_2:
             Y_ov_2_f = util.get_cderi_mo(mf.df_ri_2, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                          mol.max_memory - lib.current_memory()[0])
-        kernel_energy_mp2_ri(
+        kernel_energy_rmp2_ri(
             mo_energy_f, Y_ov_f, t_ijab, mf.params.results,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
@@ -94,14 +93,15 @@ def driver_energy_mp2(mf):
             Y_ov_2=Y_ov_2_f)
     else:
         raise NotImplementedError("Not implemented currently!")
+    return mf
 
 
-def kernel_energy_mp2_conv_full_incore(
+def kernel_energy_rmp2_conv_full_incore(
         mo_energy, mo_coeff, ao_eri,
         nocc, nvir,
         t_ijab, results,
         c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None):
-    """ Kernel of MP2 energy by conventional method.
+    """ Kernel of restricted MP2 energy by conventional method.
 
     Parameters
     ----------
@@ -167,7 +167,7 @@ def kernel_energy_mp2_conv_full_incore(
         t_Ijab = lib.einsum("ajb, jab -> jab", g_Iajb, 1 / D_Ijab)
         if t_ijab is not None:
             t_ijab[i] = t_Ijab
-        if frac_num:
+        if frac_num is not None:
             n_Ijab = frac_occ[i] * frac_occ[:, None, None] \
                 * (1 - frac_vir[None, :, None]) * (1 - frac_vir[None, None, :])
             eng_bi1 += lib.einsum("jab, jab, ajb ->", n_Ijab, t_Ijab.conj(), g_Iajb)
@@ -189,7 +189,7 @@ def kernel_energy_mp2_conv_full_incore(
     results["eng_mp2"] = eng_mp2
 
 
-def kernel_energy_mp2_ri(
+def kernel_energy_rmp2_ri(
         mo_energy, Y_ov,
         t_ijab, results,
         c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
