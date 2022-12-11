@@ -153,9 +153,9 @@ def kernel_energy_ump2_conv_full_incore(
             if frac_num is not None:
                 n_Ijab = frac_occ[s0][i] * frac_occ[s1][:, None, None] \
                     * (1 - frac_vir[s0][None, :, None]) * (1 - frac_vir[s1][None, None, :])
-                eng_spin[ss] += lib.einsum("jab, jab, jab, jab ->", n_Ijab, t_Ijab, t_Ijab, D_Ijab)
+                eng_spin[ss] += lib.einsum("jab, jab, jab, jab ->", n_Ijab, t_Ijab.conj(), t_Ijab, D_Ijab)
             else:
-                eng_spin[ss] += lib.einsum("jab, jab, jab ->", t_Ijab, t_Ijab, D_Ijab)
+                eng_spin[ss] += lib.einsum("jab, jab, jab ->", t_Ijab.conj(), t_Ijab, D_Ijab)
     eng_spin[0] *= 0.25
     eng_spin[2] *= 0.25
     eng_spin = util.check_real(eng_spin)

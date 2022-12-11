@@ -45,7 +45,7 @@ def test_rmp2_conv_giao():
         hcore_total += np.einsum("tuv, t -> uv", hcore_1_B, dev_xyz_B)
         return hcore_total
 
-    def get_ovlp(mol_):
+    def get_ovlp(mol_=mol):
         ovlp_total = np.asarray(scf.rhf.get_ovlp(mol_), dtype=np.complex128)
         ovlp_total += np.einsum("tuv, t -> uv", ovlp_1_B, dev_xyz_B)
         return ovlp_total
