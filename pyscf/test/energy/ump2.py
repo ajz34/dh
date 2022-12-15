@@ -19,7 +19,7 @@ def test_rmp2_conv_fc():
 
     mf = dh.energy.UDH(mf_s)
     mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
-    with mf.params.temporary_flags({"integral_scheme": "conv"}):
+    with mf.params.temporary_flags({"integral_scheme": "conv", "incore_t_ijab": True}):
         mf.driver_energy_mp2()
     print(mf.params.results)
     assert np.allclose(mf.params.results["eng_mp2"], -0.195783018787701)
@@ -60,3 +60,28 @@ def test_rmp2_conv_giao():
         mf.driver_energy_mp2()
     print(mf.params.results)
     assert np.allclose(mf.params.results["eng_mp2"], -0.209474427130422)
+
+
+def test_ump2_ri():
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
+    mf_s = scf.UHF(mol).run()
+
+    mf = dh.energy.UDH(mf_s)
+    mf.df_ri = df.DF(mol, df.aug_etb(mol))
+    with mf.params.temporary_flags({"integral_scheme": "ri"}):
+        mf.driver_energy_mp2()
+    print(mf.params.results)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.20915836544854347)
+
+
+def test_rmp2_ri_fc():
+    mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
+    mf_s = scf.UHF(mol).run()
+
+    mf = dh.energy.UDH(mf_s)
+    mf.df_ri = df.DF(mol, df.aug_etb(mol))
+    mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
+    with mf.params.temporary_flags({"integral_scheme": "ri"}):
+        mf.driver_energy_mp2()
+    print(mf.params.results)
+    assert np.allclose(mf.params.results["eng_mp2"], -0.19576646982349294)

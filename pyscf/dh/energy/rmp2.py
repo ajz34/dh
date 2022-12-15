@@ -81,7 +81,7 @@ def driver_energy_rmp2(mf):
         Y_ov_f = util.get_cderi_mo(mf.df_ri, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                    mol.max_memory - lib.current_memory()[0])
         Y_ov_2_f = None
-        if mf.df_ri_2:
+        if mf.df_ri_2 is not None:
             Y_ov_2_f = util.get_cderi_mo(mf.df_ri_2, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                          mol.max_memory - lib.current_memory()[0])
         kernel_energy_rmp2_ri(

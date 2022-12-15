@@ -2,6 +2,7 @@ from pyscf.dh import util
 from pyscf import ao2mo, lib
 import numpy as np
 import typing
+
 from typing import Tuple
 
 if typing.TYPE_CHECKING:
@@ -52,7 +53,7 @@ def driver_energy_ump2(mf):
         t_ijab = None
     else:
         t_ijab = [None] * 3
-        for s0, s1, ss, ssn in ((0, 0, 1), (0, 1, 1), (0, 1, 2), ("aa", "ab", "bb")):
+        for s0, s1, ss, ssn in ((0, 0, 0, "aa"), (0, 1, 1, "ab"), (1, 1, 2, "bb")):
             t_ijab[ss] = mf.params.tensors.create(
                 "t_ijab_{:}".format(ssn),
                 shape=(nocc_f[s0], nocc_f[s1], nvir_f[s0], nvir_f[s1]), incore=incore_t_ijab,
@@ -66,6 +67,27 @@ def driver_energy_ump2(mf):
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf.verbose)
+    elif mf.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
+        Y_ov_f = [util.get_cderi_mo(
+            mf.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f),
+            mol.max_memory - lib.current_memory()[0]
+        ) for s in (0, 1)]
+        Y_ov_2_f = None
+        if mf.df_ri_2 is not None:
+            Y_ov_2_f = [util.get_cderi_mo(
+                mf.df_ri_2, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f),
+                mol.max_memory - lib.current_memory()[0]
+            ) for s in (0, 1)]
+        kernel_energy_ump2_ri(
+            mo_energy_f, Y_ov_f, t_ijab, mf.params.results,
+            c_c=c_c, c_os=c_os, c_ss=c_ss,
+            frac_num=frac_num_f,
+            verbose=mf.verbose,
+            max_memory=mol.max_memory - lib.current_memory()[0],
+            Y_ov_2=Y_ov_2_f
+        )
+    else:
+        raise NotImplementedError("Not implemented currently!")
     return mf
 
 
@@ -162,3 +184,101 @@ def kernel_energy_ump2_conv_full_incore(
     eng_mp2 = c_c * (c_os * eng_spin[1] + c_ss * (eng_spin[0] + eng_spin[2]))
     results["eng_spin"] = eng_spin
     results["eng_mp2"] = eng_mp2
+
+
+def kernel_energy_ump2_ri(
+        mo_energy, Y_ov,
+        t_ijab, results,
+        c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
+    """ Kernel of unrestricted MP2 energy by RI integral.
+
+    For RI approximation, ERI integral is set to be
+
+    .. math::
+        g_{ij}^{ab} &= (ia|jb) = Y_{ia, P} Y_{jb, P}
+
+    Parameters
+    ----------
+    mo_energy : np.ndarray
+        Molecular orbital energy levels.
+    Y_ov : list(np.ndarray)
+        Cholesky decomposed 3c2e ERI in MO basis (occ-vir part). Spin in (aa, bb).
+
+    t_ijab : np.ndarray or None
+        (output) Amplitude of MP2. If None, this variable is not to be generated. Spin in (aa, bb).
+    results : dict
+        (output) Result dictionary of Params.
+
+    c_c : float
+        MP2 contribution coefficient.
+    c_os : float
+        MP2 opposite-spin contribution coefficient.
+    c_ss : float
+        MP2 same-spin contribution coefficient.
+    frac_num : np.ndarray
+        Fractional occupation number list.
+    verbose : int
+        Verbose level for PySCF.
+    max_memory : float
+        Allocatable memory in MB.
+    Y_ov_2 : list(np.ndarray)
+        Another part of 3c2e ERI in MO basis (occ-vir part). This is mostly used in magnetic computations.
+
+    Notes
+    -----
+    For energy of fractional occupation system, computation method is chosen
+    by eq (7) from Su2016 (10.1021/acs.jctc.6b00197).
+
+    Since conventional integral of MP2 is computationally costly,
+    purpose of this function should only be benchmark.
+    """
+    log = lib.logger.new_logger(verbose=verbose)
+    log.warn("Conventional integral of MP2 is not recommended!\n"
+             "Use density fitting approximation is recommended.")
+    nocc, nvir = np.array([0, 0]), np.array([0, 0])
+    naux, nocc[0], nvir[0] = Y_ov[0].shape
+    naux, nocc[1], nvir[1] = Y_ov[1].shape
+
+    if frac_num:
+        frac_occ = [frac_num[:nocc[s]] for s in (0, 1)]
+        frac_vir = [frac_num[nocc[s]:] for s in (0, 1)]
+    else:
+        frac_occ = frac_vir = None
+
+    eo = [mo_energy[s, :nocc[s]] for s in (0, 1)]
+    ev = [mo_energy[s, nocc[s]:] for s in (0, 1)]
+
+    # loops
+    eng_spin = np.array([0, 0, 0], dtype=Y_ov[0].dtype)
+    log.debug1("Start RI-MP2 loop")
+    nbatch = util.calc_batch_size(4 * max(nocc) * max(nvir) ** 2, max_memory, dtype=Y_ov[0].dtype)
+    for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
+        log.debug1("Starting spin {:}{:}".format(s0, s1))
+        for sI in util.gen_batch(0, nocc[s0], nbatch):
+            log.debug1("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
+            if Y_ov_2 is None:
+                g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[s0][:, sI], Y_ov[s1])
+            else:
+                g_Iajb = 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov[s0][:, sI], Y_ov_2[s1])
+                g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov_2[s0][:, sI], Y_ov[s1])
+            D_Ijab = (
+                + eo[s0][sI, None, None, None] + eo[s1][None, :, None, None]
+                - ev[s0][None, None, :, None] - ev[s1][None, None, None, :])
+            t_Ijab = lib.einsum("Iajb, Ijab -> Ijab", g_Iajb, 1 / D_Ijab)
+            if s0 == s1:
+                t_Ijab -= lib.einsum("Ibja, Ijab -> Ijab", g_Iajb, 1 / D_Ijab)
+            if t_ijab is not None:
+                t_ijab[ss][sI] = t_Ijab
+            if frac_num is not None:
+                n_Ijab = frac_occ[s0][sI] * frac_occ[s1][:, None, None] \
+                    * (1 - frac_vir[s0][None, :, None]) * (1 - frac_vir[s1][None, None, :])
+                eng_spin[ss] += lib.einsum("Ijab, Ijab, Ijab, Ijab ->", n_Ijab, t_Ijab.conj(), t_Ijab, D_Ijab)
+            else:
+                eng_spin[ss] += lib.einsum("Ijab, Ijab, Ijab ->", t_Ijab.conj(), t_Ijab, D_Ijab)
+    eng_spin[0] *= 0.25
+    eng_spin[2] *= 0.25
+    eng_spin = util.check_real(eng_spin)
+    eng_mp2 = c_c * (c_os * eng_spin[1] + c_ss * (eng_spin[0] + eng_spin[2]))
+    results["eng_spin"] = eng_spin
+    results["eng_mp2"] = eng_mp2
+
