@@ -3,15 +3,12 @@ from pyscf import ao2mo, lib
 import numpy as np
 import typing
 
-from typing import Tuple
-
 if typing.TYPE_CHECKING:
     from pyscf.dh.energy import UDH
 
 
 def driver_energy_ump2(mf):
     """ Driver of unrestricted MP2 energy.
-
 
     Parameters
     ----------
@@ -39,16 +36,20 @@ def driver_energy_ump2(mf):
     # parse frozen orbitals
     frozen_rule = mf.params.flags["frozen_rule"]
     frozen_list = mf.params.flags["frozen_list"]
-    frozen_orb, frozen_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
-    nmo_f = len(frozen_act)
-    nocc_f = [(frozen_act < nocc[s]).sum() for s in (0, 1)]
-    nvir_f = [nmo_f - nocc_f[s] for s in (0, 1)]
-    mo_coeff_f = mo_coeff[:, :, frozen_act]
-    mo_energy_f = mo_energy[:, frozen_act]
-    frac_num_f = frac_num[frozen_act] if frac_num else None
+    mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
+    if len(mask_act.shape) == 1:
+        # enforce mask to be [mask_act_alpha, mask_act_beta]
+        mask_act = np.array([mask_act, mask_act])
+    nmo_f = [mask_act[s].sum() for s in (0, 1)]
+    nocc_f = [mask_act[s][:nocc[s]].sum() for s in (0, 1)]
+    nvir_f = [mask_act[s][nocc[s]:].sum() for s in (0, 1)]
+    mo_coeff_f = [mo_coeff[s][:, mask_act[s]] for s in (0, 1)]
+    mo_energy_f = [mo_energy[s][mask_act[s]] for s in (0, 1)]
+    frac_num_f = frac_num if frac_num is None else [frac_num[s][mask_act[s]] for s in (0, 1)]
+    # parse space of t_ijab
     incore_t_ijab = util.parse_incore_flag(
         mf.params.flags["incore_t_ijab"], 3 * max(nocc_f)**2 * max(nvir_f)**2,
-        mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f.dtype)
+        mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f[0].dtype)
     if incore_t_ijab is None:
         t_ijab = None
     else:
@@ -69,13 +70,13 @@ def driver_energy_ump2(mf):
             verbose=mf.verbose)
     elif mf.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
         Y_ov_f = [util.get_cderi_mo(
-            mf.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f),
+            mf.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
             mol.max_memory - lib.current_memory()[0]
         ) for s in (0, 1)]
         Y_ov_2_f = None
         if mf.df_ri_2 is not None:
             Y_ov_2_f = [util.get_cderi_mo(
-                mf.df_ri_2, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f),
+                mf.df_ri_2, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
                 mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
         kernel_energy_ump2_ri(
@@ -100,9 +101,9 @@ def kernel_energy_ump2_conv_full_incore(
 
     Parameters
     ----------
-    mo_energy : np.ndarray
+    mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
-    mo_coeff : np.ndarray
+    mo_coeff : list[np.ndarray]
         Molecular coefficients.
     ao_eri : np.ndarray
         ERI that is recognized by ``pyscf.ao2mo.general``.
@@ -123,7 +124,7 @@ def kernel_energy_ump2_conv_full_incore(
         MP2 opposite-spin contribution coefficient.
     c_ss : float
         MP2 same-spin contribution coefficient.
-    frac_num : np.ndarray
+    frac_num : list[np.ndarray]
         Fractional occupation number list.
     verbose : int
         Verbose level for PySCF.
@@ -144,16 +145,16 @@ def kernel_energy_ump2_conv_full_incore(
              "Use density fitting approximation is recommended.")
 
     if frac_num:
-        frac_occ = [frac_num[:nocc[s]] for s in (0, 1)]
-        frac_vir = [frac_num[nocc[s]:] for s in (0, 1)]
+        frac_occ = [frac_num[s][:nocc[s]] for s in (0, 1)]
+        frac_vir = [frac_num[s][nocc[s]:] for s in (0, 1)]
     else:
         frac_occ = frac_vir = None
 
     # ERI conversion
-    Co = [mo_coeff[s, :, :nocc[s]] for s in (0, 1)]
-    Cv = [mo_coeff[s, :, nocc[s]:] for s in (0, 1)]
-    eo = [mo_energy[s, :nocc[s]] for s in (0, 1)]
-    ev = [mo_energy[s, nocc[s]:] for s in (0, 1)]
+    Co = [mo_coeff[s][:, :nocc[s]] for s in (0, 1)]
+    Cv = [mo_coeff[s][:, nocc[s]:] for s in (0, 1)]
+    eo = [mo_energy[s][:nocc[s]] for s in (0, 1)]
+    ev = [mo_energy[s][nocc[s]:] for s in (0, 1)]
     log.debug1("Start ao2mo")
     g_iajb = [np.array([])] * 3
     for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
@@ -162,7 +163,7 @@ def kernel_energy_ump2_conv_full_incore(
         log.debug1("Spin {:}{:} ao2mo finished".format(s0, s1))
 
     # loops
-    eng_spin = np.array([0, 0, 0], dtype=mo_coeff.dtype)
+    eng_spin = np.array([0, 0, 0], dtype=mo_coeff[0].dtype)
     for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
         for i in range(nocc[s0]):
             g_Iajb = g_iajb[ss][i]
@@ -199,9 +200,9 @@ def kernel_energy_ump2_ri(
 
     Parameters
     ----------
-    mo_energy : np.ndarray
+    mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
-    Y_ov : list(np.ndarray)
+    Y_ov : list[np.ndarray]
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part). Spin in (aa, bb).
 
     t_ijab : np.ndarray or None
@@ -215,13 +216,13 @@ def kernel_energy_ump2_ri(
         MP2 opposite-spin contribution coefficient.
     c_ss : float
         MP2 same-spin contribution coefficient.
-    frac_num : np.ndarray
+    frac_num : list[np.ndarray]
         Fractional occupation number list.
     verbose : int
         Verbose level for PySCF.
     max_memory : float
         Allocatable memory in MB.
-    Y_ov_2 : list(np.ndarray)
+    Y_ov_2 : list[np.ndarray]
         Another part of 3c2e ERI in MO basis (occ-vir part). This is mostly used in magnetic computations.
 
     Notes
@@ -240,13 +241,13 @@ def kernel_energy_ump2_ri(
     naux, nocc[1], nvir[1] = Y_ov[1].shape
 
     if frac_num:
-        frac_occ = [frac_num[:nocc[s]] for s in (0, 1)]
-        frac_vir = [frac_num[nocc[s]:] for s in (0, 1)]
+        frac_occ = [frac_num[s][:nocc[s]] for s in (0, 1)]
+        frac_vir = [frac_num[s][nocc[s]:] for s in (0, 1)]
     else:
         frac_occ = frac_vir = None
 
-    eo = [mo_energy[s, :nocc[s]] for s in (0, 1)]
-    ev = [mo_energy[s, nocc[s]:] for s in (0, 1)]
+    eo = [mo_energy[s][:nocc[s]] for s in (0, 1)]
+    ev = [mo_energy[s][nocc[s]:] for s in (0, 1)]
 
     # loops
     eng_spin = np.array([0, 0, 0], dtype=Y_ov[0].dtype)

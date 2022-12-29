@@ -156,7 +156,7 @@ def parse_frozen_numbers(mol, rule=None) -> Tuple[int, int]:
         raise ValueError("Type of Freeze rule is not recoginzed!")
 
 
-def parse_frozen_list(mol, nmo=None, frz=None, rule=None) -> Tuple[np.ndarray, np.ndarray]:
+def parse_frozen_list(mol, nmo=None, frz=None, rule=None):
     """ Parse frozen orbital list
 
     Parameters
@@ -165,25 +165,47 @@ def parse_frozen_list(mol, nmo=None, frz=None, rule=None) -> Tuple[np.ndarray, n
         Molecular object.
     nmo : int or None
         Number of molecular orbitals. If not given, atomic orbital number will be filled.
-    frz : list[int] or None
-        List of orbitals to be freezed.
+    frz : list[int] or list[list[int]] or None
+        List of orbitals to be freezed. May be restricted (list[int]) or unrestricted
+        (two list[int] indicating frozen orbital indexes of alpha and beta orbitals).
     rule : str or tuple[int, int] or dict[str or int, tuple[int, int]] or None
         Rule to be parsed. This will be explained in detail in notes.
 
     Returns
     -------
-    Tuple[np.ndarray, np.ndarray]
-        List of orbitals to be freezed and to be active.
+    np.ndarray
+        Mask of orbitals to be to be active.
     """
     if nmo is None:
         nmo = mol.nao
-    act = np.array(range(nmo))
     if frz is None:
+        # parse rules to give frozen orbitals
         if rule is None:
-            frz = np.array([], dtype=int)
-            act = np.array(range(nmo))
+            # default, all orbitals are active
+            return np.ones(nmo, dtype=bool)
         else:
+            # give mask of active orbitals from parsed number of frozen occupied and virtual numbers
             f_occ, f_vir = parse_frozen_numbers(mol, rule)
-            act = np.array(range(f_occ, nmo - f_vir))
-            frz = np.sort(np.array(list(set(range(nmo)).difference(set(act))), dtype=int))
-    return frz, act
+            act = np.zeros(nmo, dtype=bool)
+            act[np.array(range(f_occ, nmo - f_vir))] = True
+            return act
+    else:
+        # parse list of frozen orbitals
+        if not hasattr(frz, "__iter__"):
+            raise ValueError("Variable `frz` must be list[int] or list[list[int]].")
+
+        if len(frz) == 0:
+            # empty frozen orbital case
+            return np.ones(nmo, dtype=bool)
+
+        if not hasattr(frz[0], "__iter__"):
+            # one list of frozen orbitals:
+            act = np.ones(nmo, dtype=bool)
+            act[frz] = False
+            return act
+        else:
+            # multiple lists of frozen orbitals
+            act = np.ones((len(frz), nmo), dtype=bool)
+            for i, f in enumerate(frz):
+                act[i][f] = False
+            return act

@@ -52,13 +52,13 @@ def driver_energy_rmp2(mf):
     # parse frozen orbitals
     frozen_rule = mf.params.flags["frozen_rule"]
     frozen_list = mf.params.flags["frozen_list"]
-    frozen_orb, frozen_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
-    nmo_f = len(frozen_act)
-    nocc_f = (frozen_act < nocc).sum()
+    mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
+    nmo_f = mask_act.sum()
+    nocc_f = mask_act[:nocc].sum()
     nvir_f = nmo_f - nocc_f
-    mo_coeff_f = mo_coeff[:, frozen_act]
-    mo_energy_f = mo_energy[frozen_act]
-    frac_num_f = frac_num[frozen_act] if frac_num else None
+    mo_coeff_f = mo_coeff[:, mask_act]
+    mo_energy_f = mo_energy[mask_act]
+    frac_num_f = frac_num[mask_act] if frac_num else None
     # prepare t_ijab space
     incore_t_ijab = util.parse_incore_flag(
         mf.params.flags["incore_t_ijab"], nocc_f**2 * nvir_f**2,
