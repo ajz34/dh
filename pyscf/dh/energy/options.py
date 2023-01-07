@@ -98,7 +98,9 @@ Parameters
 "DCPT2"
     DCPT2 (degeneracy-corrected second-order perturbation).
 "MP2cr"
-    MP2/cr (enhanced second-order treatment of electron pair).
+    MP2/cr I (enhanced second-order treatment of electron pair).
+"MP2cr2"
+    MP2/cr II (not recommended, restricted only)
 """
 
 # endregion

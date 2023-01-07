@@ -1,9 +1,10 @@
 import unittest
-from pyscf import dh, gto, scf, df, lib
+from pyscf import dh, gto, scf, df
 import numpy as np
 
 
 class TestRIEPA(unittest.TestCase):
+
     def test_rmp2_ri(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
@@ -15,6 +16,10 @@ class TestRIEPA(unittest.TestCase):
         self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.27393741308994124))
 
     def test_rmp2cr(self):
+        # Note of this testing
+        # This molecule have degenerate orbitals
+        # DCPT2 may give different values for this case, even when SCF converges tightly
+
         # region rmp2cr mole
         mol = gto.Mole()
         mol.atom = """
@@ -89,11 +94,14 @@ class TestRIEPA(unittest.TestCase):
         }
         mol.build()
         # endregion
-        mf_s = scf.RHF(mol).run()
+        mf_s = scf.RHF(mol)
+        mf_s.conv_tol_grad = 1e-10
+        mf_s.run()
         mf = dh.energy.RDH(mf_s)
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
-        with mf.params.temporary_flags({"iepa_scheme": ["mp2cr", "mp2cr2"]}):
+        with mf.params.temporary_flags({"iepa_scheme": ["mp2", "mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"]}):
             mf.driver_energy_iepa()
-        print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_mp2cr"], -0.3362883633558271))
         self.assertTrue(np.allclose(mf.params.results["eng_mp2cr2"], -0.3250218179820349))
+        self.assertTrue(np.allclose(mf.params.results["eng_siepa"], -0.3503855844336058))
+        # self.assertTrue(np.allclose(mf.params.results["eng_dcpt2"], -0.34933565145777545))
