@@ -82,6 +82,25 @@ Parameters
     Laplace transform with resolution of identity. Opposite-spin only.
 """
 
+iepa_scheme = "MP2"
+""" Flag for IEPA-like scheme.
+
+List including the following schemes is also accepted.
+
+Parameters
+----------
+"mp2"
+    MP2 as basic method.
+"IEPA"
+    IEPA (independent electron pair approximation).
+"sIEPA"
+    Screened IEPA.
+"DCPT2"
+    DCPT2 (degeneracy-corrected second-order perturbation).
+"MP2cr"
+    MP2/cr (enhanced second-order treatment of electron pair).
+"""
+
 # endregion
 
 # region Coefficients

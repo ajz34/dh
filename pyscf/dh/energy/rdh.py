@@ -1,7 +1,9 @@
 from pyscf import lib, gto, dft, df
 import numpy as np
+
 from pyscf.dh.util import Params, HybridDict, get_default_options
 from pyscf.dh.energy.rmp2 import driver_energy_rmp2
+from pyscf.dh.energy.riepa import driver_energy_riepa
 
 
 class RDH(lib.StreamObject):
@@ -63,6 +65,8 @@ class RDH(lib.StreamObject):
     def __init__(self, mf=NotImplemented, params=None, df_ri=None):
         self.mf = mf
         self.df_ri = df_ri
+        if self.df_ri is None and hasattr(mf, "with_df"):
+            self.df_ri = mf.with_df
         self.df_ri_2 = None
         if params:
             self.params = params
@@ -71,3 +75,4 @@ class RDH(lib.StreamObject):
         self.verbose = self.mol.verbose
 
     driver_energy_mp2 = driver_energy_rmp2
+    driver_energy_iepa = driver_energy_riepa
