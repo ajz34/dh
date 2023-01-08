@@ -234,8 +234,6 @@ def kernel_energy_ump2_ri(
     purpose of this function should only be benchmark.
     """
     log = lib.logger.new_logger(verbose=verbose)
-    log.warn("Conventional integral of MP2 is not recommended!\n"
-             "Use density fitting approximation is recommended.")
     nocc, nvir = np.array([0, 0]), np.array([0, 0])
     naux, nocc[0], nvir[0] = Y_ov[0].shape
     naux, nocc[1], nvir[1] = Y_ov[1].shape

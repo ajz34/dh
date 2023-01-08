@@ -1,18 +1,17 @@
-import warnings
-
 from pyscf.dh import util
 
 from pyscf import lib
 import numpy as np
 from scipy.special import erfc
 import typing
+import warnings
 
 if typing.TYPE_CHECKING:
     from pyscf.dh.energy import RDH
 
 
 def driver_energy_riepa(mf):
-    """ Driver of pair occupied energy methods.
+    """ Driver of pair occupied energy methods (restricted).
 
     Methods included in this pair occupied energy driver are
     - IEPA (independent electron pair approximation)
@@ -124,7 +123,7 @@ def kernel_energy_riepa_ri(
         raise ValueError("Several schemes are not recognized IEPA schemes: " + ", ".join(check_iepa_scheme))
     log.info("[INFO] Recognized IEPA schemes: " + ", ".join(iepa_schemes))
 
-    # generate result of pair energies
+    # allocate pair energies
     for scheme in iepa_schemes:
         params.tensors.create("pair_{:}_aa".format(scheme), shape=(nocc, nocc))
         params.tensors.create("pair_{:}_ab".format(scheme), shape=(nocc, nocc))
@@ -304,6 +303,15 @@ def get_pair_siepa(g_ab, D_ab, scale_e, screen_func, thresh=1e-10, max_cycle=64)
 
 
 def get_pair_iepa(g_ab, D_ab, scale_e, thresh=1e-10, max_cycle=64):
+    """ Pair energy evaluation for IEPA.
+
+    This procedure sets screen function to 1.
+
+    See Also
+    --------
+    get_pair_mp2
+    get_pair_iepa
+    """
     g2_ab = g_ab * g_ab
     e = (g2_ab / D_ab).sum()
     e_old = 1e8
