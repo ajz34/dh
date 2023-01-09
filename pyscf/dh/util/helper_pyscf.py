@@ -1,8 +1,14 @@
 import numpy as np
 from typing import Tuple
 
-from pyscf import gto, data
+from pyscf import gto, data, dft
 import pyscf.data.elements
+
+
+""" Accepted advanced correlation ingredient list. """
+ACCEPTED_DH_CORR = {
+    "mp2", "iepa", "siepa", "mp2cr", "mp2cr2"
+}
 
 
 def parse_frozen_numbers(mol, rule=None) -> Tuple[int, int]:
@@ -209,3 +215,128 @@ def parse_frozen_list(mol, nmo=None, frz=None, rule=None):
             for i, f in enumerate(frz):
                 act[i][f] = False
             return act
+
+
+def parse_dh_xc_token(token, is_corr):
+    """ Parse functional token for doubly hybrid functional.
+
+    Parameters
+    ----------
+    token : str
+        Functional token. Should be something like ``0.5 * B88``.
+    is_corr : bool
+        Whether token represents exchange or correlation contribution.
+    """
+    token = token.strip()
+    try:
+        if is_corr:
+            dft.libxc.parse_xc("," + token)
+        else:
+            dft.libxc.parse_xc(token)
+        return False, token
+    except KeyError:
+        # parse number of token (code directly from pyscf.dft.libxc.parse_xc)
+        token = token.lower()
+        if token[0] == '-':
+            sign = -1
+            token = token[1:]
+        else:
+            sign = 1
+        if '*' in token:
+            fac, key = token.split('*')
+            key = key.strip()
+            if fac[0].isalpha():
+                fac, key = key, fac
+            fac = sign * float(fac)
+        else:
+            fac, key = sign, token
+        # recognize "_os", "_ss"
+        key = key.replace("-", "_").strip()
+        if "_" not in key:
+            key_name = key
+            fac_os = fac_ss = fac
+        else:
+            key_split = key.split("_")
+            if len(key_split) != 2:
+                raise KeyError("Key {:} has more than 2 underscores and can't be recognized!".format(key))
+            key_name, key_spin = key_split
+            if key_spin == "os":
+                fac_os, fac_ss = fac, 0
+            elif key_spin == "ss":
+                fac_os, fac_ss = 0, fac
+            else:
+                raise KeyError("Spin indicator {:} of key {:} is not recoginzed! Should be SS or OS."
+                               .format(key_spin, key))
+        if key_name not in ACCEPTED_DH_CORR:
+            raise KeyError("{:} is not recognized as an doubly hybrid ingredient!".format(key_name))
+        return True, (key_name, (fac_os, fac_ss))
+
+
+def parse_dh_xc_code(xc_code, is_corr=False):
+    """ Parse functional description for doubly hybrid functional.
+
+    Rule of functional description (xc code) is similar to ``pyscf.dft.libxc.parse_xc``.
+
+    In addition, advanced correlation (5th-rung correlation on Jacob's ladder) must be defined
+    in correlation part of xc code, if exchange and correlation part of xc code are separated
+    by comma.
+
+    To specify oppo-spin and same-spin contributions, ``_OS`` and ``_SS`` should be added
+    after the advanced correlation tokens.
+
+    For example, energy evaluation functional of XYGJ-OS can be defined as follows:
+
+    .. code::
+
+        "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"
+
+    Result of parsed xc code is (not the same to result of ``pyscf.dft.libxc.parse_xc``)
+
+    .. code::
+
+        ('0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP', [('mp2', (0.4364, 0))])
+
+    In the result tuple, first part is xc code of hybrid functional (<= 4th-rung), which
+    should be able to be parsed by ``pyscf.dft.libxc.parse_xc``.
+
+    Parameters
+    ----------
+    xc_code : str
+        String representation of functional description.
+    is_corr : bool
+        (internal parameter) Changes token parse logic. This parameter is not designed
+        for API users.
+
+    Returns
+    -------
+    tuple[str, list[str, tuple[float, float]]]
+
+    Notes
+    -----
+    Acceptable advanced correlation tokens are
+
+    - MP2
+    - IEPA
+    - sIEPA
+    - MP2cr
+    - MP2cr2 (for restricted only)
+    """
+    # handle codes that exchange, correlation separated by comma
+    if "," in xc_code:
+        xc_code_x, xc_code_c = xc_code.split(",")
+        xc_parsed_x = parse_dh_xc_code(xc_code_x, is_corr=False)
+        xc_parsed_c = parse_dh_xc_code(xc_code_c, is_corr=True)
+        if len(xc_parsed_x[1]) != 0:
+            raise KeyError("Advanced correlation contribution should be defined in exchange part of xc code!")
+        return xc_parsed_x[0] + ", " + xc_parsed_c[0], xc_parsed_c[1]
+    # handle usual case
+    tokens = xc_code.replace('-', '+-').replace(';+', ';').split('+')
+    xc_hyb, xc_adv = [], []
+    for token in tokens:
+        is_adv, xc_info = parse_dh_xc_token(token, is_corr)
+        if is_adv:
+            xc_adv.append(xc_info)
+        else:
+            xc_hyb.append(xc_info)
+    xc_hyb = " + ".join(xc_hyb)
+    return xc_hyb, xc_adv
