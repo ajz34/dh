@@ -48,6 +48,7 @@ def driver_energy_riepa(mf_dh):
     results = kernel_energy_riepa_ri(
         mf_dh.params, mo_energy_f, Y_ov_f,
         c_c=c_c, c_os=c_os, c_ss=c_ss,
+        screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
     )
     mf_dh.params.update_results(results)
@@ -79,7 +80,7 @@ def kernel_energy_riepa_ri(
         MP2 opposite-spin contribution coefficient.
     c_ss : float
         MP2 same-spin contribution coefficient.
-    screen_func : function
+    screen_func : callable
         Function used in screened IEPA. Default is erfc, as applied in functional ZRPS.
     thresh : float
         Threshold of pair energy convergence for IEPA or sIEPA methods.
@@ -263,7 +264,7 @@ def get_pair_siepa(g_ab, D_ab, scale_e, screen_func, thresh=1e-10, max_cycle=64)
         :math:`D_{ij}^{ab}` refers to :math:`\\varepsilon_i + \\varepsilon_j - \\varepsilon_a - \\varepsilon_b`.
     scale_e : float
         :math:`s` is scale of MP2.
-    screen_func : function
+    screen_func : callable
         Function used in screened IEPA. For example erfc, which is applied in functional ZRPS.
     thresh : float
         Threshold of pair energy convergence for IEPA or sIEPA methods.

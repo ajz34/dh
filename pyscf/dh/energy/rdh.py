@@ -1,7 +1,6 @@
-import warnings
-
 from pyscf import lib, gto, dft, df
 import numpy as np
+from scipy.special import erfc
 
 from pyscf.dh import util
 from pyscf.dh.util import Params, HybridDict
@@ -19,6 +18,8 @@ class RDH(lib.StreamObject):
     """ Density fitting object. """
     df_ri_2: df.DF or None
     """ Density fitting object for customize ERI. Used in magnetic computation. """
+    siepa_screen: callable
+    """ Screen function for sIEPA. """
 
     @property
     def mol(self) -> gto.Mole:
@@ -133,8 +134,10 @@ class RDH(lib.StreamObject):
             self.params = params
         else:
             self.params = Params(util.get_default_options(), HybridDict(), {})
+
         self.verbose = self.mol.verbose
         self.log = lib.logger.new_logger(verbose=self.verbose)
+        self.siepa_screen = erfc
 
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa
