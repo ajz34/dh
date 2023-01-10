@@ -10,7 +10,7 @@ if typing.TYPE_CHECKING:
     from pyscf.dh.energy import RDH
 
 
-def driver_energy_riepa(mf):
+def driver_energy_riepa(mf_dh):
     """ Driver of pair occupied energy methods (restricted).
 
     Methods included in this pair occupied energy driver are
@@ -24,7 +24,7 @@ def driver_energy_riepa(mf):
 
     Parameters
     ----------
-    mf : RDH
+    mf_dh : RDH
         Restricted doubly hybrid object.
 
     Returns
@@ -37,16 +37,16 @@ def driver_energy_riepa(mf):
 
     Calculation of this driver forces using density fitting MP2.
     """
-    mol = mf.mol
-    mo_energy = mf.mo_energy
-    mo_coeff = mf.mo_coeff
-    nao, nmo, nocc = mf.nao, mf.nmo, mf.nocc
-    c_c = mf.params.flags["coef_mp2"]
-    c_os = mf.params.flags["coef_mp2_os"]
-    c_ss = mf.params.flags["coef_mp2_ss"]
+    mol = mf_dh.mol
+    mo_energy = mf_dh.mo_energy
+    mo_coeff = mf_dh.mo_coeff
+    nao, nmo, nocc = mf_dh.nao, mf_dh.nmo, mf_dh.nocc
+    c_c = mf_dh.params.flags["coef_mp2"]
+    c_os = mf_dh.params.flags["coef_mp2_os"]
+    c_ss = mf_dh.params.flags["coef_mp2_ss"]
     # parse frozen orbitals
-    frozen_rule = mf.params.flags["frozen_rule"]
-    frozen_list = mf.params.flags["frozen_list"]
+    frozen_rule = mf_dh.params.flags["frozen_rule"]
+    frozen_list = mf_dh.params.flags["frozen_list"]
     mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
     nmo_f = mask_act.sum()
     nocc_f = mask_act[:nocc].sum()
@@ -54,13 +54,14 @@ def driver_energy_riepa(mf):
     mo_energy_f = mo_energy[mask_act]
     # generate ri-eri
     Y_ov_f = util.get_cderi_mo(
-        mf.df_ri, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
+        mf_dh.df_ri, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
         mol.max_memory - lib.current_memory()[0])
-    kernel_energy_riepa_ri(
-        mf.params, mo_energy_f, Y_ov_f,
+    results = kernel_energy_riepa_ri(
+        mf_dh.params, mo_energy_f, Y_ov_f,
         c_c=c_c, c_os=c_os, c_ss=c_ss,
-        verbose=mf.verbose
+        verbose=mf_dh.verbose
     )
+    mf_dh.params.update_results(results)
 
 
 def kernel_energy_riepa_ri(
@@ -75,8 +76,9 @@ def kernel_energy_riepa_ri(
     Parameters
     ----------
     params : util.Params
-        (flag and output) Results and Flags.
-        In this kernel, flags will choose how pair energy is evaluated.
+        (flag and intermediates)
+        Flags will choose how pair energy is evaluated.
+        Tensors will be updated to store pair energies and norms (MP2/cr).
     mo_energy : np.ndarray
         Molecular orbital energy levels.
     Y_ov : np.ndarray
@@ -197,16 +199,18 @@ def kernel_energy_riepa_ri(
         params.tensors["pair_mp2cr2_ab"] = params.tensors["pair_mp2_ab"] * norm
 
     # Finalize energy evaluation
+    results = dict()
     for scheme in iepa_schemes:
         eng_aa = 0.5 * params.tensors["pair_{:}_aa".format(scheme)].sum()
         eng_ab = params.tensors["pair_{:}_ab".format(scheme)].sum()
         eng_tot = c_c * (c_os * eng_ab + 2 * c_ss * eng_aa)
-        params.results["eng_{:}_aa".format(scheme)] = eng_aa
-        params.results["eng_{:}_ab".format(scheme)] = eng_ab
-        params.results["eng_{:}".format(scheme)] = eng_tot
+        results["eng_{:}_aa".format(scheme)] = eng_aa
+        results["eng_{:}_ab".format(scheme)] = eng_ab
+        results["eng_{:}".format(scheme)] = eng_tot
         log.info("[RESULT] Energy {:} of same-spin: {:18.10f}".format(scheme, eng_aa))
         log.info("[RESULT] Energy {:} of oppo-spin: {:18.10f}".format(scheme, eng_ab))
         log.info("[RESULT] Energy {:} of total: {:18.10f}".format(scheme, eng_tot))
+    return results
 
 
 def get_pair_mp2(g_ab, D_ab, scale_e):

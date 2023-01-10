@@ -7,12 +7,12 @@ if typing.TYPE_CHECKING:
     from pyscf.dh.energy import UDH
 
 
-def driver_energy_ump2(mf):
+def driver_energy_ump2(mf_dh):
     """ Driver of unrestricted MP2 energy.
 
     Parameters
     ----------
-    mf : UDH
+    mf_dh : UDH
         Restricted doubly hybrid object.
 
     Returns
@@ -25,17 +25,17 @@ def driver_energy_ump2(mf):
 
     This function does not make checks, such as SCF convergence.
     """
-    mol = mf.mol
-    mo_energy = mf.mo_energy
-    mo_coeff = mf.mo_coeff
-    nao, nmo, nocc = mf.nao, mf.nmo, mf.nocc
-    c_c = mf.params.flags["coef_mp2"]
-    c_os = mf.params.flags["coef_mp2_os"]
-    c_ss = mf.params.flags["coef_mp2_ss"]
-    frac_num = mf.params.flags["frac_num"]
+    mol = mf_dh.mol
+    mo_energy = mf_dh.mo_energy
+    mo_coeff = mf_dh.mo_coeff
+    nao, nmo, nocc = mf_dh.nao, mf_dh.nmo, mf_dh.nocc
+    c_c = mf_dh.params.flags["coef_mp2"]
+    c_os = mf_dh.params.flags["coef_mp2_os"]
+    c_ss = mf_dh.params.flags["coef_mp2_ss"]
+    frac_num = mf_dh.params.flags["frac_num"]
     # parse frozen orbitals
-    frozen_rule = mf.params.flags["frozen_rule"]
-    frozen_list = mf.params.flags["frozen_list"]
+    frozen_rule = mf_dh.params.flags["frozen_rule"]
+    frozen_list = mf_dh.params.flags["frozen_list"]
     mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
     if len(mask_act.shape) == 1:
         # enforce mask to be [mask_act_alpha, mask_act_beta]
@@ -48,54 +48,56 @@ def driver_energy_ump2(mf):
     frac_num_f = frac_num if frac_num is None else [frac_num[s][mask_act[s]] for s in (0, 1)]
     # parse space of t_ijab
     incore_t_ijab = util.parse_incore_flag(
-        mf.params.flags["incore_t_ijab"], 3 * max(nocc_f)**2 * max(nvir_f)**2,
-        mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f[0].dtype)
+        mf_dh.params.flags["incore_t_ijab"], 3 * max(nocc_f) ** 2 * max(nvir_f) ** 2,
+                                             mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f[0].dtype)
     if incore_t_ijab is None:
         t_ijab = None
     else:
         t_ijab = [None] * 3
         for s0, s1, ss, ssn in ((0, 0, 0, "aa"), (0, 1, 1, "ab"), (1, 1, 2, "bb")):
-            t_ijab[ss] = mf.params.tensors.create(
+            t_ijab[ss] = mf_dh.params.tensors.create(
                 "t_ijab_{:}".format(ssn),
                 shape=(nocc_f[s0], nocc_f[s1], nvir_f[s0], nvir_f[s1]), incore=incore_t_ijab,
                 dtype=mo_coeff.dtype)
     # MP2 kernels
-    if mf.params.flags["integral_scheme"].lower() == "conv":
-        ao_eri = mf.mf._eri
-        kernel_energy_ump2_conv_full_incore(
+    if mf_dh.params.flags["integral_scheme"].lower() == "conv":
+        ao_eri = mf_dh.mf._eri
+        result = kernel_energy_ump2_conv_full_incore(
             mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
-            t_ijab, mf.params.results,
+            t_ijab,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
-            verbose=mf.verbose)
-    elif mf.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
+            verbose=mf_dh.verbose)
+        mf_dh.params.update_results(result)
+    elif mf_dh.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
         Y_ov_f = [util.get_cderi_mo(
-            mf.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
+            mf_dh.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
             mol.max_memory - lib.current_memory()[0]
         ) for s in (0, 1)]
         Y_ov_2_f = None
-        if mf.df_ri_2 is not None:
+        if mf_dh.df_ri_2 is not None:
             Y_ov_2_f = [util.get_cderi_mo(
-                mf.df_ri_2, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
+                mf_dh.df_ri_2, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
                 mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
-        kernel_energy_ump2_ri(
-            mo_energy_f, Y_ov_f, t_ijab, mf.params.results,
+        result = kernel_energy_ump2_ri(
+            mo_energy_f, Y_ov_f, t_ijab,
             c_c=c_c, c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
-            verbose=mf.verbose,
+            verbose=mf_dh.verbose,
             max_memory=mol.max_memory - lib.current_memory()[0],
             Y_ov_2=Y_ov_2_f
         )
+        mf_dh.params.update_results(result)
     else:
         raise NotImplementedError("Not implemented currently!")
-    return mf
+    return mf_dh
 
 
 def kernel_energy_ump2_conv_full_incore(
         mo_energy, mo_coeff, ao_eri,
         nocc, nvir,
-        t_ijab, results,
+        t_ijab,
         c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None):
     """ Kernel of unrestricted MP2 energy by conventional method.
 
@@ -115,8 +117,6 @@ def kernel_energy_ump2_conv_full_incore(
 
     t_ijab : list[np.ndarray] or None
         (output) Amplitude of MP2. If None, this variable is not to be generated.
-    results : dict
-        (output) Result dictionary of Params.
 
     c_c : float
         MP2 contribution coefficient.
@@ -183,13 +183,22 @@ def kernel_energy_ump2_conv_full_incore(
     eng_spin[2] *= 0.25
     eng_spin = util.check_real(eng_spin)
     eng_mp2 = c_c * (c_os * eng_spin[1] + c_ss * (eng_spin[0] + eng_spin[2]))
-    results["eng_spin"] = eng_spin
+    # finalize results
+    results = dict()
+    results["eng_mp2_aa"] = eng_spin[0]
+    results["eng_mp2_ab"] = eng_spin[1]
+    results["eng_mp2_bb"] = eng_spin[2]
     results["eng_mp2"] = eng_mp2
+    log.info("[RESULT] Energy MP2 of spin aa: {:18.10f}".format(eng_spin[0]))
+    log.info("[RESULT] Energy MP2 of spin ab: {:18.10f}".format(eng_spin[1]))
+    log.info("[RESULT] Energy MP2 of spin bb: {:18.10f}".format(eng_spin[2]))
+    log.info("[RESULT] Energy MP2 of total: {:18.10f}".format(eng_mp2))
+    return results
 
 
 def kernel_energy_ump2_ri(
         mo_energy, Y_ov,
-        t_ijab, results,
+        t_ijab,
         c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
     """ Kernel of unrestricted MP2 energy by RI integral.
 
@@ -207,8 +216,6 @@ def kernel_energy_ump2_ri(
 
     t_ijab : np.ndarray or None
         (output) Amplitude of MP2. If None, this variable is not to be generated. Spin in (aa, bb).
-    results : dict
-        (output) Result dictionary of Params.
 
     c_c : float
         MP2 contribution coefficient.
@@ -278,6 +285,15 @@ def kernel_energy_ump2_ri(
     eng_spin[2] *= 0.25
     eng_spin = util.check_real(eng_spin)
     eng_mp2 = c_c * (c_os * eng_spin[1] + c_ss * (eng_spin[0] + eng_spin[2]))
-    results["eng_spin"] = eng_spin
+    # finalize results
+    results = dict()
+    results["eng_mp2_aa"] = eng_spin[0]
+    results["eng_mp2_ab"] = eng_spin[1]
+    results["eng_mp2_bb"] = eng_spin[2]
     results["eng_mp2"] = eng_mp2
+    log.info("[RESULT] Energy MP2 of spin aa: {:18.10f}".format(eng_spin[0]))
+    log.info("[RESULT] Energy MP2 of spin ab: {:18.10f}".format(eng_spin[1]))
+    log.info("[RESULT] Energy MP2 of spin bb: {:18.10f}".format(eng_spin[2]))
+    log.info("[RESULT] Energy MP2 of total: {:18.10f}".format(eng_mp2))
+    return results
 

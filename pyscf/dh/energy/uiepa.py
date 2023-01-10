@@ -11,12 +11,12 @@ if typing.TYPE_CHECKING:
     from pyscf.dh.energy import UDH
 
 
-def driver_energy_uiepa(mf):
+def driver_energy_uiepa(mf_dh):
     """ Driver of pair occupied energy methods (unrestricted).
 
     Parameters
     ----------
-    mf : UDH
+    mf_dh : UDH
         Unrestricted doubly hybrid object.
 
     Returns
@@ -27,16 +27,16 @@ def driver_energy_uiepa(mf):
     --------
     pyscf.dh.energy.riepa.driver_energy_riepa
     """
-    mol = mf.mol
-    mo_energy = mf.mo_energy
-    mo_coeff = mf.mo_coeff
-    nao, nmo, nocc = mf.nao, mf.nmo, mf.nocc
-    c_c = mf.params.flags["coef_mp2"]
-    c_os = mf.params.flags["coef_mp2_os"]
-    c_ss = mf.params.flags["coef_mp2_ss"]
+    mol = mf_dh.mol
+    mo_energy = mf_dh.mo_energy
+    mo_coeff = mf_dh.mo_coeff
+    nao, nmo, nocc = mf_dh.nao, mf_dh.nmo, mf_dh.nocc
+    c_c = mf_dh.params.flags["coef_mp2"]
+    c_os = mf_dh.params.flags["coef_mp2_os"]
+    c_ss = mf_dh.params.flags["coef_mp2_ss"]
     # parse frozen orbitals
-    frozen_rule = mf.params.flags["frozen_rule"]
-    frozen_list = mf.params.flags["frozen_list"]
+    frozen_rule = mf_dh.params.flags["frozen_rule"]
+    frozen_list = mf_dh.params.flags["frozen_list"]
     mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
     if len(mask_act.shape) == 1:
         # enforce mask to be [mask_act_alpha, mask_act_beta]
@@ -47,14 +47,15 @@ def driver_energy_uiepa(mf):
     mo_energy_f = [mo_energy[s][mask_act[s]] for s in (0, 1)]
     # generate ri-eri
     Y_ov_f = [util.get_cderi_mo(
-        mf.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
+        mf_dh.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
         mol.max_memory - lib.current_memory()[0]
     ) for s in (0, 1)]
-    kernel_energy_uiepa_ri(
-        mf.params, mo_energy_f, Y_ov_f,
+    results = kernel_energy_uiepa_ri(
+        mf_dh.params, mo_energy_f, Y_ov_f,
         c_c=c_c, c_os=c_os, c_ss=c_ss,
-        verbose=mf.verbose
+        verbose=mf_dh.verbose
     )
+    mf_dh.params.update_results(results)
 
 
 def kernel_energy_uiepa_ri(
@@ -69,8 +70,9 @@ def kernel_energy_uiepa_ri(
     Parameters
     ----------
     params : util.Params
-        (flag and output) Results and Flags.
-        In this kernel, flags will choose how pair energy is evaluated.
+        (flag and intermediates)
+        Flags will choose how pair energy is evaluated.
+        Tensors will be updated to store pair energies and norms (MP2/cr).
     mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
     Y_ov : list[np.ndarray]
@@ -184,21 +186,23 @@ def kernel_energy_uiepa_ri(
         params.tensors["pair_mp2cr_bb"] = params.tensors["pair_mp2_bb"] / norms[2]
 
     # Finalize energy evaluation
+    results = dict()
     for scheme in iepa_schemes:
         eng_os = eng_ss = 0
         for ssn in ("aa", "ab", "bb"):
             is_same_spin = ssn[0] == ssn[1]
             scale = 0.25 if is_same_spin else 1
             eng_pair = scale * params.tensors["pair_{:}_{:}".format(scheme, ssn)].sum()
-            params.results["eng_{:}_{:}".format(scheme, ssn)] = eng_pair
+            results["eng_{:}_{:}".format(scheme, ssn)] = eng_pair
             log.info("[RESULT] Energy {:} of spin {:}: {:18.10f}".format(scheme, ssn, eng_pair))
             if is_same_spin:
                 eng_ss += eng_pair
             else:
                 eng_os += eng_pair
         eng_tot = c_c * (c_os * eng_os + 2 * c_ss * eng_ss)
-        params.results["eng_{:}".format(scheme)] = eng_tot
+        results["eng_{:}".format(scheme)] = eng_tot
         log.info("[RESULT] Energy {:} of total: {:18.10f}".format(scheme, eng_tot))
+    return results
 
 
 def get_ump2cr_norm(n2_aa, n2_ab, n2_bb):

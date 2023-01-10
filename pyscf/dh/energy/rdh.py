@@ -1,3 +1,5 @@
+import warnings
+
 from pyscf import lib, gto, dft, df
 import numpy as np
 
@@ -64,9 +66,14 @@ class RDH(lib.StreamObject):
 
     def __init__(self, mf=NotImplemented, params=None, df_ri=None):
         self.mf = mf
+        log = lib.logger.new_logger(verbose=self.mol.verbose)
         self.df_ri = df_ri
         if self.df_ri is None and hasattr(mf, "with_df"):
             self.df_ri = mf.with_df
+        if self.df_ri is None:
+            log.warn("[WARN] Density-fitting object not found. "
+                     "Generate a pyscf.df.DF object by default aug-etb settings.")
+            self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
         self.df_ri_2 = None
         if params:
             self.params = params

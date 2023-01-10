@@ -1,4 +1,6 @@
 import tempfile
+import warnings
+
 import h5py
 import pickle
 import numpy as np
@@ -285,25 +287,27 @@ class HybridDict(dict):
 
 @dataclass
 class Params:
-    """
-    Parameters and data
+    """ Parameters and data.
 
     This class hope programmers adopting variable protection.
     See documentation for developer.
     """
     flags: dict
-    """
-    Flags stored by dictionary. Suggests to be composed by simple types such as
+    """ Flags stored by dictionary.
+    
+    Suggests to be composed by simple types such as
     booleans, integers and strings. Should be serializable by pickle.
     """
     tensors: HybridDict
-    """
-    Intermediate tensors. Large tensors are supposed to be written into this dictionary.
+    """ Intermediate tensors.
+    
+    Large tensors are supposed to be written into this dictionary.
     Should be serializable.
     """
     results: dict
-    """
-    Computed results stored by dictionary. Should be serializable.
+    """ Computed results stored by dictionary.
+    
+    Should be serializable. Array size of values stored in dictionary should be generally small.
     """
 
     def __iter__(self):
@@ -311,8 +315,7 @@ class Params:
 
     @contextmanager
     def fill_default_flag(self, default_flag):
-        """
-        Temporarily fill with default flags.
+        """ Temporarily fill with default flags.
 
         User-defined flags will be preserved while flags defined in ``default_flag``
         but not in current flags will be included.
@@ -331,8 +334,7 @@ class Params:
 
     @contextmanager
     def temporary_flags(self, add_flags):
-        """
-        Temporarily additional flags.
+        """ Temporarily additional flags.
 
         Use this function by with expression::
 
@@ -348,3 +350,29 @@ class Params:
         self.flags.update(add_flags)
         yield self
         self.flags = old_flags
+
+    def update_results(self, income_result, allow_overwrite=True, warn_overwrite=True):
+        """ Update results.
+
+        This function may change attribute ``self.results``.
+
+        Parameters
+        ----------
+        income_result : dict
+            Result dictionary to be updated into ``self.results``.
+        allow_overwrite : bool
+            Whether allows overwriting result dictionary.
+        warn_overwrite : bool
+            Whether warns overwriting result dictionary.
+        """
+        if not allow_overwrite or warn_overwrite:
+            keys_interset = set(income_result).intersection(self.results)
+            if len(keys_interset) != 0:
+                if not allow_overwrite:
+                    raise KeyError("Overwrite results is not allowed!\n"
+                                   "Repeated keys: [{:}]".format(", ".join(keys_interset)))
+                if warn_overwrite:
+                    warnings.warn("Some keys are overwrited when updating results dictionary.\n"
+                                  "Repeated keys: [{:}]".format(", ".join(keys_interset)))
+        self.results.update(income_result)
+        return self
