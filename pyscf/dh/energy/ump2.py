@@ -49,7 +49,7 @@ def driver_energy_ump2(mf_dh):
     # parse space of t_ijab
     incore_t_ijab = util.parse_incore_flag(
         mf_dh.params.flags["incore_t_ijab"], 3 * max(nocc_f) ** 2 * max(nvir_f) ** 2,
-                                             mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f[0].dtype)
+        mol.max_memory - lib.current_memory()[0], dtype=mo_coeff_f[0].dtype)
     if incore_t_ijab is None:
         t_ijab = None
     else:

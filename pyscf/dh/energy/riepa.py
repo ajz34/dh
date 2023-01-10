@@ -37,25 +37,14 @@ def driver_energy_riepa(mf_dh):
 
     Calculation of this driver forces using density fitting MP2.
     """
-    mol = mf_dh.mol
-    mo_energy = mf_dh.mo_energy
-    mo_coeff = mf_dh.mo_coeff
-    nao, nmo, nocc = mf_dh.nao, mf_dh.nmo, mf_dh.nocc
     c_c = mf_dh.params.flags["coef_mp2"]
     c_os = mf_dh.params.flags["coef_mp2_os"]
     c_ss = mf_dh.params.flags["coef_mp2_ss"]
     # parse frozen orbitals
-    frozen_rule = mf_dh.params.flags["frozen_rule"]
-    frozen_list = mf_dh.params.flags["frozen_list"]
-    mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
-    nmo_f = mask_act.sum()
-    nocc_f = mask_act[:nocc].sum()
-    mo_coeff_f = mo_coeff[:, mask_act]
-    mo_energy_f = mo_energy[mask_act]
+    mo_energy_f = mf_dh.mo_energy_f
     # generate ri-eri
-    Y_ov_f = util.get_cderi_mo(
-        mf_dh.df_ri, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
-        mol.max_memory - lib.current_memory()[0])
+    Y_ov_f = mf_dh.get_Y_ov_f()
+    # kernel
     results = kernel_energy_riepa_ri(
         mf_dh.params, mo_energy_f, Y_ov_f,
         c_c=c_c, c_os=c_os, c_ss=c_ss,
