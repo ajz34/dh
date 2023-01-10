@@ -373,6 +373,8 @@ class Params:
                                    "Repeated keys: [{:}]".format(", ".join(keys_interset)))
                 if warn_overwrite:
                     warnings.warn("Some keys are overwrited when updating results dictionary.\n"
+                                  "Use this result with caution! It's recommended to repeat computation without "
+                                  "calling multiple drivers.\n"
                                   "Repeated keys: [{:}]".format(", ".join(keys_interset)))
         self.results.update(income_result)
         return self

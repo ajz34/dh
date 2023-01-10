@@ -27,29 +27,12 @@ def driver_energy_uiepa(mf_dh):
     --------
     pyscf.dh.energy.riepa.driver_energy_riepa
     """
-    mol = mf_dh.mol
-    mo_energy = mf_dh.mo_energy
-    mo_coeff = mf_dh.mo_coeff
-    nao, nmo, nocc = mf_dh.nao, mf_dh.nmo, mf_dh.nocc
     c_c = mf_dh.params.flags["coef_mp2"]
     c_os = mf_dh.params.flags["coef_mp2_os"]
     c_ss = mf_dh.params.flags["coef_mp2_ss"]
-    # parse frozen orbitals
-    frozen_rule = mf_dh.params.flags["frozen_rule"]
-    frozen_list = mf_dh.params.flags["frozen_list"]
-    mask_act = util.parse_frozen_list(mol, nmo, frozen_list, frozen_rule)
-    if len(mask_act.shape) == 1:
-        # enforce mask to be [mask_act_alpha, mask_act_beta]
-        mask_act = np.array([mask_act, mask_act])
-    nmo_f = [mask_act[s].sum() for s in (0, 1)]
-    nocc_f = [mask_act[s][:nocc[s]].sum() for s in (0, 1)]
-    mo_coeff_f = [mo_coeff[s][:, mask_act[s]] for s in (0, 1)]
-    mo_energy_f = [mo_energy[s][mask_act[s]] for s in (0, 1)]
+    mo_energy_f = mf_dh.mo_energy_f
     # generate ri-eri
-    Y_ov_f = [util.get_cderi_mo(
-        mf_dh.df_ri, mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
-        mol.max_memory - lib.current_memory()[0]
-    ) for s in (0, 1)]
+    Y_ov_f = mf_dh.get_Y_ov_f()
     results = kernel_energy_uiepa_ri(
         mf_dh.params, mo_energy_f, Y_ov_f,
         c_c=c_c, c_os=c_os, c_ss=c_ss,
