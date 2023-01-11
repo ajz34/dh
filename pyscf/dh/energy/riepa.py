@@ -37,9 +37,8 @@ def driver_energy_riepa(mf_dh):
 
     Calculation of this driver forces using density fitting MP2.
     """
-    c_c = mf_dh.params.flags["coef_mp2"]
-    c_os = mf_dh.params.flags["coef_mp2_os"]
-    c_ss = mf_dh.params.flags["coef_mp2_ss"]
+    c_os = mf_dh.params.flags["coef_os"]
+    c_ss = mf_dh.params.flags["coef_ss"]
     # parse frozen orbitals
     mo_energy_f = mf_dh.mo_energy_f
     # generate ri-eri
@@ -47,7 +46,7 @@ def driver_energy_riepa(mf_dh):
     # kernel
     results = kernel_energy_riepa_ri(
         mf_dh.params, mo_energy_f, Y_ov_f,
-        c_c=c_c, c_os=c_os, c_ss=c_ss,
+        c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
     )
@@ -56,7 +55,7 @@ def driver_energy_riepa(mf_dh):
 
 def kernel_energy_riepa_ri(
         params, mo_energy, Y_ov,
-        c_c=1., c_os=1., c_ss=1., screen_func=erfc,
+        c_os=1., c_ss=1., screen_func=erfc,
         thresh=1e-10, max_cycle=64,
         verbose=None):
     """ Kernel of restricted IEPA-like methods.
@@ -74,8 +73,6 @@ def kernel_energy_riepa_ri(
     Y_ov : np.ndarray
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
 
-    c_c : float
-        MP2 contribution coefficient.
     c_os : float
         MP2 opposite-spin contribution coefficient.
     c_ss : float
@@ -193,7 +190,7 @@ def kernel_energy_riepa_ri(
     for scheme in iepa_schemes:
         eng_aa = 0.5 * params.tensors["pair_{:}_aa".format(scheme)].sum()
         eng_ab = params.tensors["pair_{:}_ab".format(scheme)].sum()
-        eng_tot = c_c * (c_os * eng_ab + 2 * c_ss * eng_aa)
+        eng_tot = c_os * eng_ab + 2 * c_ss * eng_aa
         results["eng_{:}_aa".format(scheme)] = eng_aa
         results["eng_{:}_ab".format(scheme)] = eng_ab
         results["eng_{:}".format(scheme)] = eng_tot

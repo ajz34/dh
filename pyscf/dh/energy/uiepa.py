@@ -27,15 +27,14 @@ def driver_energy_uiepa(mf_dh):
     --------
     pyscf.dh.energy.riepa.driver_energy_riepa
     """
-    c_c = mf_dh.params.flags["coef_mp2"]
-    c_os = mf_dh.params.flags["coef_mp2_os"]
-    c_ss = mf_dh.params.flags["coef_mp2_ss"]
+    c_os = mf_dh.params.flags["coef_os"]
+    c_ss = mf_dh.params.flags["coef_ss"]
     mo_energy_f = mf_dh.mo_energy_f
     # generate ri-eri
     Y_ov_f = mf_dh.get_Y_ov_f()
     results = kernel_energy_uiepa_ri(
         mf_dh.params, mo_energy_f, Y_ov_f,
-        c_c=c_c, c_os=c_os, c_ss=c_ss,
+        c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
     )
@@ -44,7 +43,7 @@ def driver_energy_uiepa(mf_dh):
 
 def kernel_energy_uiepa_ri(
         params, mo_energy, Y_ov,
-        c_c=1., c_os=1., c_ss=1., screen_func=erfc,
+        c_os=1., c_ss=1., screen_func=erfc,
         thresh=1e-10, max_cycle=64,
         verbose=None):
     """ Kernel of restricted IEPA-like methods.
@@ -62,8 +61,6 @@ def kernel_energy_uiepa_ri(
     Y_ov : list[np.ndarray]
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
 
-    c_c : float
-        MP2 contribution coefficient.
     c_os : float
         MP2 opposite-spin contribution coefficient.
     c_ss : float
@@ -183,7 +180,7 @@ def kernel_energy_uiepa_ri(
                 eng_ss += eng_pair
             else:
                 eng_os += eng_pair
-        eng_tot = c_c * (c_os * eng_os + 2 * c_ss * eng_ss)
+        eng_tot = c_os * eng_os + 2 * c_ss * eng_ss
         results["eng_{:}".format(scheme)] = eng_tot
         log.info("[RESULT] Energy {:} of total: {:18.10f}".format(scheme, eng_tot))
     return results

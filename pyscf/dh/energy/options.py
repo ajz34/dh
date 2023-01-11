@@ -107,13 +107,10 @@ Parameters
 
 # region Coefficients
 
-coef_mp2 = 1
-""" Coefficient of contribution to MP2 energy. """
-
-coef_mp2_os = 1
+coef_os = 1
 """ Coefficient of opposite-spin contribution to MP2 energy. """
 
-coef_mp2_ss = 1
+coef_ss = 1
 """ Coefficient of same-spin contribution to MP2 energy. """
 
 # endregion

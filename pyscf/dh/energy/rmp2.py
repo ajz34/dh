@@ -42,9 +42,8 @@ def driver_energy_rmp2(mf_dh):
     This function does not make checks, such as SCF convergence.
     """
     mol = mf_dh.mol
-    c_c = mf_dh.params.flags["coef_mp2"]
-    c_os = mf_dh.params.flags["coef_mp2_os"]
-    c_ss = mf_dh.params.flags["coef_mp2_ss"]
+    c_os = mf_dh.params.flags["coef_os"]
+    c_ss = mf_dh.params.flags["coef_ss"]
     frac_num = mf_dh.params.flags["frac_num"]
     # parse frozen orbitals
     mask_act = mf_dh.get_mask_act()
@@ -58,7 +57,7 @@ def driver_energy_rmp2(mf_dh):
         results = kernel_energy_rmp2_conv_full_incore(
             mf_dh.params,
             mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
-            c_c=c_c, c_os=c_os, c_ss=c_ss,
+            c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             max_memory=mol.max_memory - lib.current_memory()[0],
             verbose=mf_dh.verbose)
@@ -72,7 +71,7 @@ def driver_energy_rmp2(mf_dh):
         results = kernel_energy_rmp2_ri(
             mf_dh.params,
             mo_energy_f, Y_ov_f,
-            c_c=c_c, c_os=c_os, c_ss=c_ss,
+            c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf_dh.verbose,
             max_memory=mol.max_memory - lib.current_memory()[0],
@@ -86,7 +85,7 @@ def driver_energy_rmp2(mf_dh):
 def kernel_energy_rmp2_conv_full_incore(
         params, mo_energy, mo_coeff, ao_eri,
         nocc, nvir,
-        c_c=1., c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=None):
+        c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=None):
     """ Kernel of restricted MP2 energy by conventional method.
 
     Parameters
@@ -107,8 +106,6 @@ def kernel_energy_rmp2_conv_full_incore(
     nvir : int
         Number of virtual orbitals.
 
-    c_c : float
-        MP2 contribution coefficient.
     c_os : float
         MP2 opposite-spin contribution coefficient.
     c_ss : float
@@ -176,7 +173,7 @@ def kernel_energy_rmp2_conv_full_incore(
     # report
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2
-    eng_mp2 = c_c * (c_os * eng_os + c_ss * eng_ss)
+    eng_mp2 = c_os * eng_os + c_ss * eng_ss
     # results
     results = dict()
     results["eng_bi1"] = eng_bi1
@@ -192,7 +189,7 @@ def kernel_energy_rmp2_conv_full_incore(
 
 def kernel_energy_rmp2_ri(
         params, mo_energy, Y_ov,
-        c_c=1., c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
+        c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
     """ Kernel of MP2 energy by RI integral.
 
     For RI approximation, ERI integral is set to be
@@ -211,8 +208,6 @@ def kernel_energy_rmp2_ri(
     Y_ov : np.ndarray
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
 
-    c_c : float
-        MP2 contribution coefficient.
     c_os : float
         MP2 opposite-spin contribution coefficient.
     c_ss : float
@@ -285,7 +280,7 @@ def kernel_energy_rmp2_ri(
     # report
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2
-    eng_mp2 = c_c * (c_os * eng_os + c_ss * eng_ss)
+    eng_mp2 = c_os * eng_os + c_ss * eng_ss
     # results
     results = dict()
     results["eng_bi1"] = eng_bi1
