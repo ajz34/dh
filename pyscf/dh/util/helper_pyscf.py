@@ -128,7 +128,7 @@ def parse_frozen_numbers(mol, rule=None) -> Tuple[int, int]:
     if rule is None:
         return 0, 0
     elif isinstance(rule, tuple):
-        return tuple
+        return rule
     elif isinstance(rule, dict):
         r = {}
         for key, val in rule.items():
@@ -228,30 +228,43 @@ def parse_dh_xc_token(token, is_corr):
         Whether token represents exchange or correlation contribution.
     """
     token = token.strip()
+    # parse number of token (code directly from pyscf.dft.libxc.parse_xc)
+    token = token.upper()
+    if token[0] == '-':
+        sign = -1
+        token = token[1:]
+    else:
+        sign = 1
+    if '*' in token:
+        fac, key = token.split('*')
+        key = key.strip()
+        if fac[0].isalpha():
+            fac, key = key, fac
+        fac = sign * float(fac)
+    else:
+        fac, key = sign, token
+
     try:
         if is_corr:
             dft.libxc.parse_xc("," + token)
         else:
             dft.libxc.parse_xc(token)
-        return False, token
+        return "hyb", token
     except KeyError:
-        # parse number of token (code directly from pyscf.dft.libxc.parse_xc)
-        token = token.lower()
-        if token[0] == '-':
-            sign = -1
-            token = token[1:]
-        else:
-            sign = 1
-        if '*' in token:
-            fac, key = token.split('*')
-            key = key.strip()
-            if fac[0].isalpha():
-                fac, key = key, fac
-            fac = sign * float(fac)
-        else:
-            fac, key = sign, token
+        # other correlation contribution case
+        # VV10 or VV10(b; C)
+        if "vv10" in key.lower():
+            key = key.strip().lower()
+            assert key[:4] == "vv10"
+            if "(" not in key:
+                return "other", ("vv10", (5.9, 0.0093))
+            else:
+                values = key[4:].replace("(", "").replace(")", "").split(";")
+                assert len(values) == 2
+                return "other", ("vv10", fac, (float(values[0]), float(values[1])))
+        # advanced correlation of 5th-rung functionals
         # recognize "_os", "_ss"
-        key = key.replace("-", "_").strip()
+        key = key.replace("-", "_").strip().lower()
         if "_" not in key:
             key_name = key
             fac_os = fac_ss = fac
@@ -269,10 +282,10 @@ def parse_dh_xc_token(token, is_corr):
                                .format(key_spin, key))
         if key_name not in ACCEPTED_DH_CORR:
             raise KeyError("{:} is not recognized as an doubly hybrid ingredient!".format(key_name))
-        return True, (key_name, (fac_os, fac_ss))
+        return "adv", (key_name, (fac_os, fac_ss))
 
 
-def parse_dh_xc_code(xc_code, is_corr=False):
+def parse_dh_xc_code_string(xc_code, is_corr=False):
     """ Parse functional description for doubly hybrid functional.
 
     Rule of functional description (xc code) is similar to ``pyscf.dft.libxc.parse_xc``.
@@ -294,10 +307,12 @@ def parse_dh_xc_code(xc_code, is_corr=False):
 
     .. code::
 
-        ('0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP', [('mp2', (0.4364, 0))])
+        ('0.7731*hf + 0.2269*lda, 0.2309*vwn3 + 0.2754*lyp', [('mp2', (0.4364, 0))], [])
 
     In the result tuple, first part is xc code of hybrid functional (<= 4th-rung), which
     should be able to be parsed by ``pyscf.dft.libxc.parse_xc``.
+
+    We use lower case to represent all xc codes after parsing.
 
     Parameters
     ----------
@@ -309,7 +324,7 @@ def parse_dh_xc_code(xc_code, is_corr=False):
 
     Returns
     -------
-    tuple[str, list[str, tuple[float, float]]]
+    tuple[str, list[str, tuple[float, float]], list]
 
     Notes
     -----
@@ -324,19 +339,32 @@ def parse_dh_xc_code(xc_code, is_corr=False):
     # handle codes that exchange, correlation separated by comma
     if "," in xc_code:
         xc_code_x, xc_code_c = xc_code.split(",")
-        xc_parsed_x = parse_dh_xc_code(xc_code_x, is_corr=False)
-        xc_parsed_c = parse_dh_xc_code(xc_code_c, is_corr=True)
+        xc_parsed_x = parse_dh_xc_code_string(xc_code_x, is_corr=False)
+        xc_parsed_c = parse_dh_xc_code_string(xc_code_c, is_corr=True)
         if len(xc_parsed_x[1]) != 0:
             raise KeyError("Advanced correlation contribution should be defined in exchange part of xc code!")
-        return xc_parsed_x[0] + ", " + xc_parsed_c[0], xc_parsed_c[1]
+        return xc_parsed_x[0] + ", " + xc_parsed_c[0], xc_parsed_c[1], xc_parsed_x[2] + xc_parsed_c[2]
     # handle usual case
     tokens = xc_code.replace('-', '+-').replace(';+', ';').split('+')
-    xc_hyb, xc_adv = [], []
+    xc_hyb, xc_adv, xc_other = [], [], []
     for token in tokens:
-        is_adv, xc_info = parse_dh_xc_token(token, is_corr)
-        if is_adv:
-            xc_adv.append(xc_info)
-        else:
+        # note that xc_type can be "hyb", "adv", "other"; not the same to pyscf's convention
+        xc_type, xc_info = parse_dh_xc_token(token, is_corr)
+        if xc_type == "hyb":
             xc_hyb.append(xc_info)
-    xc_hyb = " + ".join(xc_hyb)
-    return xc_hyb, xc_adv
+        elif xc_type == "adv":
+            xc_adv.append(xc_info)
+        elif xc_type == "other":
+            xc_other.append(xc_info)
+        else:
+            assert False
+    xc_hyb = " + ".join(xc_hyb).strip().lower()
+    # post process advanced correlations
+    dict_xc_adv = dict()
+    for key, val in xc_adv:
+        if key not in dict_xc_adv:
+            dict_xc_adv[key] = val
+        else:
+            dict_xc_adv[key] = tuple(np.array(val) + np.array(dict_xc_adv[key]))
+    xc_adv = list(dict_xc_adv.items())
+    return xc_hyb, xc_adv, xc_other

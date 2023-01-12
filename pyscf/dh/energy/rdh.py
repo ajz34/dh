@@ -6,12 +6,15 @@ from pyscf.dh import util
 from pyscf.dh.util import Params, HybridDict
 from pyscf.dh.energy.rmp2 import driver_energy_rmp2
 from pyscf.dh.energy.riepa import driver_energy_riepa
+from pyscf.dh.energy.rdft import driver_energy_dh
 
 
 class RDH(lib.StreamObject):
     """ Restricted doubly hybrid class. """
     mf: dft.rks.RKS
     """ Self consistent object. """
+    xc_dh: str
+    """ Exchange-correlation code for energy evaluation of doubly hybrid functional. """
     params: Params
     """ Params object consisting of flags, tensors and results. """
     df_ri: df.DF or None
@@ -20,6 +23,39 @@ class RDH(lib.StreamObject):
     """ Density fitting object for customize ERI. Used in magnetic computation. """
     siepa_screen: callable
     """ Screen function for sIEPA. """
+
+    def __init__(self, mf_or_xc=NotImplemented, xc_dh=None, params=None, df_ri=None):
+        if isinstance(mf_or_xc, str):
+            raise NotImplementedError
+        else:
+            mf = mf_or_xc
+
+        self.mf = mf
+        log = lib.logger.new_logger(verbose=self.mol.verbose)
+        if not self.mf.converged:
+            log.warn("SCF not converged!")
+        if not hasattr(mf, "xc"):
+            log.warn("We only accept density functionals here.\n"
+                     "If you pass an HF instance, we convert to KS object naively.")
+            self.mf = self.mf.to_rks("HF") if self.restricted else self.mf.to_uks("HF")
+            self.mf.initialize_grids(self.mol, self.mf.make_rdm1())
+        self.df_ri = df_ri
+        if self.df_ri is None and hasattr(mf, "with_df"):
+            self.df_ri = mf.with_df
+        if self.df_ri is None:
+            log.warn("Density-fitting object not found. "
+                     "Generate a pyscf.df.DF object by default aug-etb settings.")
+            self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
+
+        if params:
+            self.params = params
+        else:
+            self.params = Params(util.get_default_options(), HybridDict(), {})
+
+        self.df_ri_2 = None
+        self.verbose = self.mol.verbose
+        self.log = lib.logger.new_logger(verbose=self.verbose)
+        self.siepa_screen = erfc
 
     @property
     def mol(self) -> gto.Mole:
@@ -119,25 +155,6 @@ class RDH(lib.StreamObject):
             Y_ov_f = self.params.tensors["Y_ov_f"]
         return Y_ov_f
 
-    def __init__(self, mf=NotImplemented, params=None, df_ri=None):
-        self.mf = mf
-        log = lib.logger.new_logger(verbose=self.mol.verbose)
-        self.df_ri = df_ri
-        if self.df_ri is None and hasattr(mf, "with_df"):
-            self.df_ri = mf.with_df
-        if self.df_ri is None:
-            log.warn("Density-fitting object not found. "
-                     "Generate a pyscf.df.DF object by default aug-etb settings.")
-            self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
-        self.df_ri_2 = None
-        if params:
-            self.params = params
-        else:
-            self.params = Params(util.get_default_options(), HybridDict(), {})
-
-        self.verbose = self.mol.verbose
-        self.log = lib.logger.new_logger(verbose=self.verbose)
-        self.siepa_screen = erfc
-
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa
+    driver_energy_dh = driver_energy_dh
