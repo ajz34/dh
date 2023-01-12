@@ -12,7 +12,7 @@ class TestRMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.273944755130888))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.273944755130888))
 
     def test_rmp2_conv_fc(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -23,7 +23,7 @@ class TestRMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.2602324295391498))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.2602324295391498))
 
     def test_rmp2_conv_giao(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -59,7 +59,7 @@ class TestRMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.27425584824874516))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27425584824874516))
 
     def test_rmp2_ri(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -70,7 +70,7 @@ class TestRMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.27393741308994124))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27393741308994124))
 
     def test_rmp2_ri_fc(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -82,7 +82,7 @@ class TestRMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.2602250917785774))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.2602250917785774))
 
     def test_rmp2_ri_giao(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -132,4 +132,4 @@ class TestRMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.27424683619063206))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27424683619063206))

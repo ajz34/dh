@@ -12,7 +12,7 @@ class TestUMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.209174918573074))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.209174918573074))
 
     def test_rmp2_conv_fc(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
@@ -24,7 +24,7 @@ class TestUMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "conv", "incore_t_ijab": True}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.195783018787701))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.195783018787701))
 
         # test frozen core with different indexes on alpha/beta orbitals
         with mf.params.temporary_flags({"integral_scheme": "conv", "incore_t_ijab": True,
@@ -34,7 +34,7 @@ class TestUMP2(unittest.TestCase):
             mf.params.tensors.clear()
             mf.driver_energy_mp2()
         print(mf.params.results)
-        # self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.10559463994349409))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.10559463994349409))
 
     def test_rmp2_conv_giao(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
@@ -70,7 +70,7 @@ class TestUMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.209474427130422))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.209474427130422))
 
     def test_ump2_ri(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
@@ -81,7 +81,7 @@ class TestUMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.20915836544854347))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.20915836544854347))
 
     def test_rmp2_ri_fc(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
@@ -93,7 +93,7 @@ class TestUMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.19576646982349294))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.19576646982349294))
 
     def test_rmp2_ri_giao(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", spin=1, charge=1, basis="cc-pVTZ").build()
@@ -143,4 +143,4 @@ class TestUMP2(unittest.TestCase):
         with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True}):
             mf.driver_energy_mp2()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.20945698217515063))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.20945698217515063))

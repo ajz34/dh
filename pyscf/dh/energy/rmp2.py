@@ -178,9 +178,9 @@ def kernel_energy_rmp2_conv_full_incore(
     results = dict()
     results["eng_bi1"] = eng_bi1
     results["eng_bi2"] = eng_bi2
-    results["eng_os"] = eng_os
-    results["eng_ss"] = eng_ss
-    results["eng_mp2"] = eng_mp2
+    results["eng_MP2_os"] = eng_os
+    results["eng_MP2_ss"] = eng_ss
+    results["eng_MP2"] = eng_mp2
     log.info("[RESULT] Energy MP2 of same-spin: {:18.10f}".format(eng_ss))
     log.info("[RESULT] Energy MP2 of oppo-spin: {:18.10f}".format(eng_os))
     log.info("[RESULT] Energy MP2 of total: {:18.10f}".format(eng_mp2))
@@ -285,9 +285,9 @@ def kernel_energy_rmp2_ri(
     results = dict()
     results["eng_bi1"] = eng_bi1
     results["eng_bi2"] = eng_bi2
-    results["eng_os"] = eng_os
-    results["eng_ss"] = eng_ss
-    results["eng_mp2"] = eng_mp2
+    results["eng_MP2_os"] = eng_os
+    results["eng_MP2_ss"] = eng_ss
+    results["eng_MP2"] = eng_mp2
     log.info("[RESULT] Energy MP2 of same-spin: {:18.10f}".format(eng_ss))
     log.info("[RESULT] Energy MP2 of oppo-spin: {:18.10f}".format(eng_os))
     log.info("[RESULT] Energy MP2 of total: {:18.10f}".format(eng_mp2))

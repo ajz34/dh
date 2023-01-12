@@ -7,7 +7,7 @@ import pyscf.data.elements
 
 """ Accepted advanced correlation ingredient list. """
 ACCEPTED_DH_CORR = {
-    "mp2", "iepa", "siepa", "mp2cr", "mp2cr2"
+    "MP2", "IEPA", "SIEPA", "MP2CR", "MP2CR2"
 }
 
 
@@ -253,18 +253,18 @@ def parse_dh_xc_token(token, is_corr):
     except KeyError:
         # other correlation contribution case
         # VV10 or VV10(b; C)
-        if "vv10" in key.lower():
-            key = key.strip().lower()
-            assert key[:4] == "vv10"
+        if "VV10" in key.upper():
+            key = key.strip().upper()
+            assert key[:4] == "VV10"
             if "(" not in key:
-                return "other", ("vv10", (5.9, 0.0093))
+                return "other", ("VV10", (5.9, 0.0093))
             else:
                 values = key[4:].replace("(", "").replace(")", "").split(";")
                 assert len(values) == 2
-                return "other", ("vv10", fac, (float(values[0]), float(values[1])))
+                return "other", ("VV10", fac, (float(values[0]), float(values[1])))
         # advanced correlation of 5th-rung functionals
         # recognize "_os", "_ss"
-        key = key.replace("-", "_").strip().lower()
+        key = key.replace("-", "_").strip().upper()
         if "_" not in key:
             key_name = key
             fac_os = fac_ss = fac
@@ -273,9 +273,9 @@ def parse_dh_xc_token(token, is_corr):
             if len(key_split) != 2:
                 raise KeyError("Key {:} has more than 2 underscores and can't be recognized!".format(key))
             key_name, key_spin = key_split
-            if key_spin == "os":
+            if key_spin == "OS":
                 fac_os, fac_ss = fac, 0
-            elif key_spin == "ss":
+            elif key_spin == "SS":
                 fac_os, fac_ss = 0, fac
             else:
                 raise KeyError("Spin indicator {:} of key {:} is not recoginzed! Should be SS or OS."
@@ -307,12 +307,12 @@ def parse_dh_xc_code_string(xc_code, is_corr=False):
 
     .. code::
 
-        ('0.7731*hf + 0.2269*lda, 0.2309*vwn3 + 0.2754*lyp', [('mp2', (0.4364, 0))], [])
+        ('0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP', [('MP2', (0.4364, 0))], [])
 
     In the result tuple, first part is xc code of hybrid functional (<= 4th-rung), which
     should be able to be parsed by ``pyscf.dft.libxc.parse_xc``.
 
-    We use lower case to represent all xc codes after parsing.
+    We use upper case to represent all xc codes after parsing.
 
     Parameters
     ----------
@@ -358,7 +358,7 @@ def parse_dh_xc_code_string(xc_code, is_corr=False):
             xc_other.append(xc_info)
         else:
             assert False
-    xc_hyb = " + ".join(xc_hyb).strip().lower()
+    xc_hyb = " + ".join(xc_hyb).strip().upper()
     # post process advanced correlations
     dict_xc_adv = dict()
     for key, val in xc_adv:

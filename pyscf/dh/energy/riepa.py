@@ -92,7 +92,7 @@ def kernel_energy_riepa_ri(
 
     - ``pair_METHOD_aa`` and ``pair_METHOD_ab``: pair energy of specified IEPA ``METHOD``.
     - ``n2_pair_aa`` and ``n2_pair_ab``: sum of squares of tensor :math:`n_{ij} = \\sum_{ab} (t_{ij}^{ab})^2`.
-    - ``norm_METHOD``: normalization factors of ``mp2cr`` or ``mp2cr2``.
+    - ``norm_METHOD``: normalization factors of ``MP2CR`` or ``MP2CR2``.
     """
     log = lib.logger.new_logger(verbose=verbose)
     naux, nocc, nvir = Y_ov.shape
@@ -102,12 +102,12 @@ def kernel_energy_riepa_ri(
     # parse IEPA schemes
     # `iepa_schemes` option is either str or list[str]; change to list
     if not isinstance(params.flags["iepa_scheme"], str):
-        iepa_schemes = [i.lower() for i in params.flags["iepa_scheme"]]
+        iepa_schemes = [i.upper() for i in params.flags["iepa_scheme"]]
     else:
-        iepa_schemes = [params.flags["iepa_scheme"].lower()]
+        iepa_schemes = [params.flags["iepa_scheme"].upper()]
 
     # check IEPA scheme sanity
-    check_iepa_scheme = set(iepa_schemes).difference(["mp2", "mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"])
+    check_iepa_scheme = set(iepa_schemes).difference(["MP2", "MP2CR", "MP2CR2", "DCPT2", "IEPA", "SIEPA"])
     if len(check_iepa_scheme) != 0:
         raise ValueError("Several schemes are not recognized IEPA schemes: " + ", ".join(check_iepa_scheme))
     log.info("[INFO] Recognized IEPA schemes: " + ", ".join(iepa_schemes))
@@ -116,19 +116,19 @@ def kernel_energy_riepa_ri(
     for scheme in iepa_schemes:
         params.tensors.create("pair_{:}_aa".format(scheme), shape=(nocc, nocc))
         params.tensors.create("pair_{:}_ab".format(scheme), shape=(nocc, nocc))
-        if scheme in ["mp2cr", "mp2cr2"]:
-            if "pair_mp2_aa" not in params.tensors:
-                params.tensors.create("pair_mp2_aa", shape=(nocc, nocc))
-                params.tensors.create("pair_mp2_ab", shape=(nocc, nocc))
+        if scheme in ["MP2CR", "MP2CR2"]:
+            if "pair_MP2_aa" not in params.tensors:
+                params.tensors.create("pair_MP2_aa", shape=(nocc, nocc))
+                params.tensors.create("pair_MP2_ab", shape=(nocc, nocc))
             if "n2_pair_aa" not in params.tensors:
                 params.tensors.create("n2_pair_aa", shape=(nocc, nocc))
                 params.tensors.create("n2_pair_ab", shape=(nocc, nocc))
 
     # In evaluation of MP2/cr or MP2/cr2, MP2 pair energy is evaluated first.
     schemes_for_pair = set(iepa_schemes)
-    if "mp2cr" in schemes_for_pair or "mp2cr2" in schemes_for_pair:
-        schemes_for_pair.difference_update(["mp2cr", "mp2cr2"])
-        schemes_for_pair.add("mp2")
+    if "MP2CR" in schemes_for_pair or "MP2CR2" in schemes_for_pair:
+        schemes_for_pair.difference_update(["MP2CR", "MP2CR2"])
+        schemes_for_pair.add("MP2")
     # scratch tensor of - e_a - e_b
     D_ab = - ev[:, None] - ev[None, :]
     # main driver
@@ -142,16 +142,16 @@ def kernel_energy_riepa_ri(
             for scheme in schemes_for_pair:
                 pair_aa = params.tensors["pair_{:}_aa".format(scheme)]
                 pair_ab = params.tensors["pair_{:}_ab".format(scheme)]
-                if scheme == "mp2":
+                if scheme == "MP2":
                     e_pair_os = get_pair_mp2(g_IJab, D_IJab, 1)
                     e_pair_ss = get_pair_mp2(g_IJab_asym, D_IJab, 0.5)
-                elif scheme == "dcpt2":
+                elif scheme == "DCPT2":
                     e_pair_os = get_pair_dcpt2(g_IJab, D_IJab, 1)
                     e_pair_ss = get_pair_dcpt2(g_IJab_asym, D_IJab, 0.5)
-                elif scheme == "iepa":
+                elif scheme == "IEPA":
                     e_pair_os = get_pair_iepa(g_IJab, D_IJab, 1, thresh=thresh, max_cycle=max_cycle)
                     e_pair_ss = get_pair_iepa(g_IJab_asym, D_IJab, 0.5, thresh=thresh, max_cycle=max_cycle)
-                elif scheme == "siepa":
+                elif scheme == "SIEPA":
                     e_pair_os = get_pair_siepa(g_IJab, D_IJab, 1,
                                                screen_func=screen_func, thresh=thresh, max_cycle=max_cycle)
                     e_pair_ss = get_pair_siepa(g_IJab_asym, D_IJab, 0.5,
@@ -161,7 +161,7 @@ def kernel_energy_riepa_ri(
                 pair_aa[I, J] = pair_aa[J, I] = e_pair_ss
                 pair_ab[I, J] = pair_ab[J, I] = e_pair_os
             # MP2/cr methods require norm
-            if "mp2cr" in iepa_schemes or "mp2cr2" in iepa_schemes:
+            if "MP2CR" in iepa_schemes or "MP2CR2" in iepa_schemes:
                 n2_aa = params.tensors["n2_pair_aa"]
                 n2_ab = params.tensors["n2_pair_ab"]
                 n2_aa[I, J] = n2_aa[J, I] = ((g_IJab_asym / D_IJab)**2).sum()
@@ -169,21 +169,21 @@ def kernel_energy_riepa_ri(
 
     # process MP2/cr afterwards
     # MP2/cr I
-    if "mp2cr" in iepa_schemes:
+    if "MP2CR" in iepa_schemes:
         n2_aa = params.tensors["n2_pair_aa"]
         n2_ab = params.tensors["n2_pair_ab"]
         norm = get_rmp2cr_norm(n2_aa, n2_ab)
-        params.tensors["norm_mp2cr"] = norm
-        params.tensors["pair_mp2cr_aa"] = params.tensors["pair_mp2_aa"] / norm
-        params.tensors["pair_mp2cr_ab"] = params.tensors["pair_mp2_ab"] / norm
+        params.tensors["norm_MP2CR"] = norm
+        params.tensors["pair_MP2CR_aa"] = params.tensors["pair_MP2_aa"] / norm
+        params.tensors["pair_MP2CR_ab"] = params.tensors["pair_MP2_ab"] / norm
     # MP2/cr II
-    if "mp2cr2" in iepa_schemes:
+    if "MP2CR2" in iepa_schemes:
         n2_aa = params.tensors["n2_pair_aa"]
         n2_ab = params.tensors["n2_pair_ab"]
         norm = get_rmp2cr2_norm(n2_aa, n2_ab)
-        params.tensors["norm_mp2cr2"] = norm
-        params.tensors["pair_mp2cr2_aa"] = params.tensors["pair_mp2_aa"] * norm
-        params.tensors["pair_mp2cr2_ab"] = params.tensors["pair_mp2_ab"] * norm
+        params.tensors["norm_MP2CR2"] = norm
+        params.tensors["pair_MP2CR2_aa"] = params.tensors["pair_MP2_aa"] * norm
+        params.tensors["pair_MP2CR2_ab"] = params.tensors["pair_MP2_ab"] * norm
 
     # Finalize energy evaluation
     results = dict()

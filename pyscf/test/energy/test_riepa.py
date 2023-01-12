@@ -13,7 +13,7 @@ class TestRIEPA(unittest.TestCase):
         with mf.params.temporary_flags({"iepa_scheme": "mp2"}):
             mf.driver_energy_iepa()
         print(mf.params.results)
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2"], -0.27393741308994124))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27393741308994124))
 
     def test_rmp2cr(self):
         # Note of this testing
@@ -101,7 +101,7 @@ class TestRIEPA(unittest.TestCase):
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"]}):
             mf.driver_energy_iepa()
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2cr"], -0.3362883633558271))
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2cr2"], -0.3250218179820349))
-        self.assertTrue(np.allclose(mf.params.results["eng_siepa"], -0.3503855844336058))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2CR"], -0.3362883633558271))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2CR2"], -0.3250218179820349))
+        self.assertTrue(np.allclose(mf.params.results["eng_SIEPA"], -0.3503855844336058))
         # self.assertTrue(np.allclose(mf.params.results["eng_dcpt2"], -0.34933565145777545))

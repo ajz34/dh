@@ -85,14 +85,16 @@ class TestUIEPA(unittest.TestCase):
         mol.build()
         # endregion
         mf_s = scf.UHF(mol)
-        mf_s.conv_tol_grad = 1e-10
+        # mf_s.conv_tol_grad = 1e-10
         mf_s.run()
         mf = dh.energy.UDH(mf_s)
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["mp2cr", "dcpt2", "iepa", "siepa"]}):
             mf.driver_energy_iepa()
-        self.assertTrue(np.allclose(mf.params.results["eng_mp2cr"], -0.3362883633558271))
-        self.assertTrue(np.allclose(mf.params.results["eng_siepa"], -0.3503855844336058))
+        print(mf.params.results["eng_MP2CR"])
+        print(mf.params.results["eng_SIEPA"])
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2CR"], -0.3362883633558271))
+        self.assertTrue(np.allclose(mf.params.results["eng_SIEPA"], -0.3503855844336058))
         # self.assertTrue(np.allclose(mf.params.results["eng_dcpt2"], -0.34933565145777545))
 
     def test_usiepa(self):
@@ -103,4 +105,4 @@ class TestUIEPA(unittest.TestCase):
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["siepa"]}):
             mf.driver_energy_iepa()
-        self.assertTrue(np.allclose(mf.params.results["eng_siepa"], -1.354538466289851))
+        self.assertTrue(np.allclose(mf.params.results["eng_SIEPA"], -1.354538466289851))

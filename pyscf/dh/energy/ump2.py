@@ -171,10 +171,10 @@ def kernel_energy_ump2_conv_full_incore(
     eng_mp2 = c_os * eng_spin[1] + c_ss * (eng_spin[0] + eng_spin[2])
     # finalize results
     results = dict()
-    results["eng_mp2_aa"] = eng_spin[0]
-    results["eng_mp2_ab"] = eng_spin[1]
-    results["eng_mp2_bb"] = eng_spin[2]
-    results["eng_mp2"] = eng_mp2
+    results["eng_MP2_aa"] = eng_spin[0]
+    results["eng_MP2_ab"] = eng_spin[1]
+    results["eng_MP2_bb"] = eng_spin[2]
+    results["eng_MP2"] = eng_mp2
     log.info("[RESULT] Energy MP2 of spin aa: {:18.10f}".format(eng_spin[0]))
     log.info("[RESULT] Energy MP2 of spin ab: {:18.10f}".format(eng_spin[1]))
     log.info("[RESULT] Energy MP2 of spin bb: {:18.10f}".format(eng_spin[2]))
@@ -285,10 +285,10 @@ def kernel_energy_ump2_ri(
     eng_mp2 = c_os * eng_spin[1] + c_ss * (eng_spin[0] + eng_spin[2])
     # finalize results
     results = dict()
-    results["eng_mp2_aa"] = eng_spin[0]
-    results["eng_mp2_ab"] = eng_spin[1]
-    results["eng_mp2_bb"] = eng_spin[2]
-    results["eng_mp2"] = eng_mp2
+    results["eng_MP2_aa"] = eng_spin[0]
+    results["eng_MP2_ab"] = eng_spin[1]
+    results["eng_MP2_bb"] = eng_spin[2]
+    results["eng_MP2"] = eng_mp2
     log.info("[RESULT] Energy MP2 of spin aa: {:18.10f}".format(eng_spin[0]))
     log.info("[RESULT] Energy MP2 of spin ab: {:18.10f}".format(eng_spin[1]))
     log.info("[RESULT] Energy MP2 of spin bb: {:18.10f}".format(eng_spin[2]))

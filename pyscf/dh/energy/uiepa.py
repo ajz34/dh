@@ -88,12 +88,12 @@ def kernel_energy_uiepa_ri(
     # parse IEPA schemes
     # `iepa_schemes` option is either str or list[str]; change to list
     if not isinstance(params.flags["iepa_scheme"], str):
-        iepa_schemes = [i.lower() for i in params.flags["iepa_scheme"]]
+        iepa_schemes = [i.upper() for i in params.flags["iepa_scheme"]]
     else:
-        iepa_schemes = [params.flags["iepa_scheme"].lower()]
-    check_iepa_scheme = set(iepa_schemes).difference(["mp2", "mp2cr", "dcpt2", "iepa", "siepa"])
+        iepa_schemes = [params.flags["iepa_scheme"].upper()]
+    check_iepa_scheme = set(iepa_schemes).difference(["MP2", "MP2CR", "DCPT2", "IEPA", "SIEPA"])
     if len(check_iepa_scheme) != 0:
-        if "mp2cr2" in check_iepa_scheme:
+        if "MP2CR2" in check_iepa_scheme:
             warnings.warn("MP2/cr II is not available for unrestricted methods!")
         raise ValueError("Several schemes are not recognized IEPA schemes: " + ", ".join(check_iepa_scheme))
     log.info("[INFO] Recognized IEPA schemes: " + ", ".join(iepa_schemes))
@@ -103,20 +103,20 @@ def kernel_energy_uiepa_ri(
         params.tensors.create("pair_{:}_aa".format(scheme), shape=(nocc[0], nocc[0]))
         params.tensors.create("pair_{:}_ab".format(scheme), shape=(nocc[0], nocc[1]))
         params.tensors.create("pair_{:}_bb".format(scheme), shape=(nocc[1], nocc[1]))
-        if scheme == "mp2cr":
-            if "pair_mp2_aa" not in params.tensors:
-                params.tensors.create("pair_mp2_aa", shape=(nocc[0], nocc[0]))
-                params.tensors.create("pair_mp2_ab", shape=(nocc[0], nocc[1]))
-                params.tensors.create("pair_mp2_bb", shape=(nocc[1], nocc[1]))
+        if scheme == "MP2CR":
+            if "pair_MP2_aa" not in params.tensors:
+                params.tensors.create("pair_MP2_aa", shape=(nocc[0], nocc[0]))
+                params.tensors.create("pair_MP2_ab", shape=(nocc[0], nocc[1]))
+                params.tensors.create("pair_MP2_bb", shape=(nocc[1], nocc[1]))
             params.tensors.create("n2_pair_aa", shape=(nocc[0], nocc[0]))
             params.tensors.create("n2_pair_ab", shape=(nocc[0], nocc[1]))
             params.tensors.create("n2_pair_bb", shape=(nocc[1], nocc[1]))
 
     # In evaluation of MP2/cr, MP2 pair energy is evaluated first.
     schemes_for_pair = set(iepa_schemes)
-    if "mp2cr" in schemes_for_pair:
-        schemes_for_pair.difference_update(["mp2cr"])
-        schemes_for_pair.add("mp2")
+    if "MP2CR" in schemes_for_pair:
+        schemes_for_pair.difference_update(["MP2CR"])
+        schemes_for_pair.add("MP2")
 
     for ssn, s0, s1 in [("aa", 0, 0), ("ab", 0, 1), ("bb", 1, 1)]:
         log.debug1("In IEPA kernel, spin {:}".format(ssn))
@@ -134,13 +134,13 @@ def kernel_energy_uiepa_ri(
                 for scheme in schemes_for_pair:
                     pair_mat = params.tensors["pair_{:}_{:}".format(scheme, ssn)]
                     scale = 0.5 if is_same_spin else 1
-                    if scheme == "mp2":
+                    if scheme == "MP2":
                         e_pair = get_pair_mp2(g_IJab, D_IJab, scale)
-                    elif scheme == "dcpt2":
+                    elif scheme == "DCPT2":
                         e_pair = get_pair_dcpt2(g_IJab, D_IJab, scale)
-                    elif scheme == "iepa":
+                    elif scheme == "IEPA":
                         e_pair = get_pair_iepa(g_IJab, D_IJab, scale, thresh=thresh, max_cycle=max_cycle)
-                    elif scheme == "siepa":
+                    elif scheme == "SIEPA":
                         e_pair = get_pair_siepa(g_IJab, D_IJab, scale,
                                                 screen_func=screen_func, thresh=thresh, max_cycle=max_cycle)
                     else:
@@ -148,7 +148,7 @@ def kernel_energy_uiepa_ri(
                     pair_mat[I, J] = e_pair
                     if is_same_spin:
                         pair_mat[J, I] = e_pair
-                if "mp2cr" in iepa_schemes:
+                if "MP2CR" in iepa_schemes:
                     n2_mat = params.tensors["n2_pair_{:}".format(ssn)]
                     n2_val = ((g_IJab / D_IJab)**2).sum()
                     n2_mat[I, J] = n2_val
@@ -156,15 +156,15 @@ def kernel_energy_uiepa_ri(
                         n2_mat[J, I] = n2_val
 
     # process MP2/cr afterwards
-    if "mp2cr" in iepa_schemes:
+    if "MP2CR" in iepa_schemes:
         n2_aa = params.tensors["n2_pair_aa"]
         n2_ab = params.tensors["n2_pair_ab"]
         n2_bb = params.tensors["n2_pair_bb"]
         norms = get_ump2cr_norm(n2_aa, n2_ab, n2_bb)
-        params.tensors["norm_mp2cr_aa"], params.tensors["norm_mp2cr_ab"], params.tensors["norm_mp2cr_bb"] = norms
-        params.tensors["pair_mp2cr_aa"] = params.tensors["pair_mp2_aa"] / norms[0]
-        params.tensors["pair_mp2cr_ab"] = params.tensors["pair_mp2_ab"] / norms[1]
-        params.tensors["pair_mp2cr_bb"] = params.tensors["pair_mp2_bb"] / norms[2]
+        params.tensors["norm_MP2CR_aa"], params.tensors["norm_MP2CR_ab"], params.tensors["norm_MP2CR_bb"] = norms
+        params.tensors["pair_MP2CR_aa"] = params.tensors["pair_MP2_aa"] / norms[0]
+        params.tensors["pair_MP2CR_ab"] = params.tensors["pair_MP2_ab"] / norms[1]
+        params.tensors["pair_MP2CR_bb"] = params.tensors["pair_MP2_bb"] / norms[2]
 
     # Finalize energy evaluation
     results = dict()

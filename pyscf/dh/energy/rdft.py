@@ -35,10 +35,10 @@ def driver_energy_dh(mf_dh, xc_code):
     omega, alpha, hyb = ni.rsh_and_hybrid_coeff(xc_pure)
     if abs(omega) > 1e-10:
         result.update(kernel_energy_restricted_exactx(mf_dh.mf, mf_dh.mf.make_rdm1(), omega))
-        eng_tot += (alpha - hyb) * result["eng_lr_hf({:})".format(omega)]
+        eng_tot += (alpha - hyb) * result["eng_LR_HF({:})".format(omega)]
     if abs(hyb) > 1e-10:
         result.update(kernel_energy_restricted_exactx(mf_dh.mf, mf_dh.mf.make_rdm1()))
-        eng_tot += hyb * result["eng_hf".format(omega)]
+        eng_tot += hyb * result["eng_HF".format(omega)]
     # general xc
     if xc_pure != "":
         grids = mf_dh.mf.grids
@@ -47,19 +47,19 @@ def driver_energy_dh(mf_dh, xc_code):
         eng_tot += result["eng_purexc_{:}".format(xc_pure)]
     # 2. advanced correlation (5th-rung)
     for xc_key, xc_param in xc_adv_list:
-        if xc_key == "mp2":
+        if xc_key == "MP2":
             with mf_dh.params.temporary_flags({"coef_os": xc_param[0], "coef_ss": xc_param[1]}):
                 mf_dh.driver_energy_mp2()
-                result["eng_mp2"] = mf_dh.params.results["eng_mp2"]
-                eng_tot += result["eng_mp2"]
-        elif xc_key in ["mp2cr", "mp2cr2", "iepa", "siepa"]:
+                result["eng_MP2"] = mf_dh.params.results["eng_mp2"]
+                eng_tot += result["eng_MP2"]
+        elif xc_key in ["MP2CR", "MP2CR2", "IEPA", "SIEPA"]:
             with mf_dh.params.temporary_flags({
                     "coef_os": xc_param[0], "coef_ss": xc_param[1], "iepa_scheme": xc_key}):
                 mf_dh.driver_energy_iepa()
                 eng_tot += result["eng_{:}".format(xc_key)]
     # 3. other xc cases
     for xc_other in xc_other_list:
-        if xc_other[0] == "vv10":
+        if xc_other[0] == "VV10":
             # vv10
             fac, nlc_pars = xc_other[1:]
             grids = mf_dh.mf.grids
@@ -69,7 +69,7 @@ def driver_energy_dh(mf_dh, xc_code):
             vvrho = get_rho(mf_dh.mol, nlcgrids, mf_dh.mf.make_rdm1())
             exc_vv10, _ = dft.numint._vv10nlc(rho, grids.coords, vvrho, nlcgrids.weights, nlcgrids.coords, nlc_pars)
             eng_vv10 = (rho[0] * grids.weights * exc_vv10).sum()
-            result["eng_vv10({:}; {:})".format(*nlc_pars)] = eng_vv10
+            result["eng_VV10({:}; {:})".format(*nlc_pars)] = eng_vv10
             eng_tot += fac * eng_vv10
         else:
             raise KeyError("Currently only VV10 is accepted as other special component of xc.")
@@ -99,9 +99,9 @@ def kernel_energy_restricted_exactx(mf, dm, omega=None):
     # results
     result = dict()
     if omega is None:
-        result["eng_hf"] = ex
+        result["eng_HF"] = ex
     else:
-        result["eng_lr_hf({:})".format(omega)] = ex
+        result["eng_LR_HF({:})".format(omega)] = ex
     return result
 
 
