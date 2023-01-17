@@ -134,7 +134,7 @@ def kernel_energy_riepa_ri(
     # main driver
     for I in range(nocc):
         for J in range(I + 1):
-            log.debug1("In IEPA kernel, pair ({:}, {:})".format(I, J))
+            log.debug("In IEPA kernel, pair ({:}, {:})".format(I, J))
             D_IJab = eo[I] + eo[J] + D_ab
             g_IJab = Y_ov[:, I].T @ Y_ov[:, J]  # PIa, PJb -> IJab
             g_IJab_asym = g_IJab - g_IJab.T

@@ -1,4 +1,5 @@
 import numpy as np
+import re
 from typing import Tuple
 
 from pyscf import gto, data, dft
@@ -7,8 +8,39 @@ import pyscf.data.elements
 
 """ Accepted advanced correlation ingredient list. """
 ACCEPTED_DH_CORR = {
-    "MP2", "IEPA", "SIEPA", "MP2CR", "MP2CR2"
+    "MP2", "IEPA", "SIEPA", "MP2CR", "MP2CR2", "DCPT2"
 }
+
+""" Common name and detailed xc code of doubly hybrids. """
+XC_DH_MAP = {   # [xc_for_scf (without advanced corr), xc_for_energy]
+    "MP2": "HF + MP2",
+    "XYG3": ("B3LYPg", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2"),
+    "XYGJ-OS": ("B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"),
+    "xDH-PBE0": ("PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"),
+    "B2PLYP": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
+    "mPW2PLYP": "0.55*HF + 0.45*mPW91, 0.75*LYP + 0.25*MP2",
+    "PBE0-DH": "0.5*HF + 0.5*PBE, 0.875*PBE + 0.125*MP2",
+    "PBE-QIDH": "0.693361*HF + 0.306639*PBE, 0.666667*PBE + 0.333333*MP2",
+    "PBE0-2": "0.793701*HF + 0.206299*PBE, 0.5*PBE + 0.5*MP2",
+    "revXYG3": ("B3LYPg", "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2"),
+    "XYG5": ("B3LYPg", "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS"),
+    "XYG6": ("B3LYPg", "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS"),
+    "XYG7": ("B3LYPg", "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS"),
+    "revXYGJ-OS": ("B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"),
+    "XYGJ-OS5": ("B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"),
+    "B2GPPLYP": "0.65*HF + 0.35*B88, 0.64*LYP + 0.36*MP2",
+    "LS1DH-PBE": "0.75*HF + 0.25*PBE, 0.578125*PBE + 0.421875*MP2",
+    "DSD-PBEP86-D3": "0.69*HF + 0.31*PBE, 0.44*P86 + 0.52*MP2_OS + 0.22*MP2_SS",
+    "DSD-PBEPBE-D3": "0.68*HF + 0.32*PBE, 0.49*PBE + 0.55*MP2_OS + 0.13*MP2_SS",
+    "DSD-BLYP-D3": "0.71*HF + 0.29*B88, 0.54*LYP + 0.47*MP2_OS + 0.40*MP2_SS",
+    "DSD-PBEB95-D3": "0.66*HF + 0.34*PBE, 0.55*B95 + 0.46*MP2_OS + 0.09*MP2_SS",
+    "B2PLYP-D3": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
+}
+
+# upper xc dh common name without -, _, space
+XC_DH_NORMED_SET = dict()
+for _xc_code in XC_DH_MAP:
+    XC_DH_NORMED_SET[re.sub("[-_ ]", "", _xc_code).upper()] = _xc_code
 
 
 def parse_frozen_numbers(mol, rule=None) -> Tuple[int, int]:
@@ -227,29 +259,29 @@ def parse_dh_xc_token(token, is_corr):
     is_corr : bool
         Whether token represents exchange or correlation contribution.
     """
-    token = token.strip()
+    token = token.strip().upper()
     # parse number of token (code directly from pyscf.dft.libxc.parse_xc)
-    token = token.upper()
     if token[0] == '-':
         sign = -1
-        token = token[1:]
+        token = token[1:].strip()
     else:
         sign = 1
     if '*' in token:
-        fac, key = token.split('*')
+        fac, key = token.strip().split('*')
         key = key.strip()
         if fac[0].isalpha():
             fac, key = key, fac
         fac = sign * float(fac)
     else:
-        fac, key = sign, token
+        fac, key = sign, token.strip()
 
     try:
+        token_if_pure = ("- " if sign == -1 else "") + token
         if is_corr:
-            dft.libxc.parse_xc("," + token)
+            dft.libxc.parse_xc("," + token_if_pure)
         else:
-            dft.libxc.parse_xc(token)
-        return "hyb", token
+            dft.libxc.parse_xc(token_if_pure)
+        return "hyb", token_if_pure
     except KeyError:
         # other correlation contribution case
         # VV10 or VV10(b; C)
@@ -285,8 +317,8 @@ def parse_dh_xc_token(token, is_corr):
         return "adv", (key_name, (fac_os, fac_ss))
 
 
-def parse_dh_xc_code_string(xc_code, is_corr=False):
-    """ Parse functional description for doubly hybrid functional.
+def parse_dh_xc_code_detailed(xc_code, is_corr=False):
+    """ Parse detailed functional description for doubly hybrid functional.
 
     Rule of functional description (xc code) is similar to ``pyscf.dft.libxc.parse_xc``.
 
@@ -317,14 +349,15 @@ def parse_dh_xc_code_string(xc_code, is_corr=False):
     Parameters
     ----------
     xc_code : str
-        String representation of functional description.
+        String representation of functional detailed description.
     is_corr : bool
         (internal parameter) Changes token parse logic. This parameter is not designed
         for API users.
 
     Returns
     -------
-    tuple[str, list[str, tuple[float, float]], list]
+    tuple
+        Parsed xc code of 3 parts: hybrid, advanced correlation, other.
 
     Notes
     -----
@@ -335,12 +368,13 @@ def parse_dh_xc_code_string(xc_code, is_corr=False):
     - sIEPA
     - MP2cr
     - MP2cr2 (for restricted only)
+    - DCPT2
     """
     # handle codes that exchange, correlation separated by comma
     if "," in xc_code:
         xc_code_x, xc_code_c = xc_code.split(",")
-        xc_parsed_x = parse_dh_xc_code_string(xc_code_x, is_corr=False)
-        xc_parsed_c = parse_dh_xc_code_string(xc_code_c, is_corr=True)
+        xc_parsed_x = parse_dh_xc_code_detailed(xc_code_x, is_corr=False)
+        xc_parsed_c = parse_dh_xc_code_detailed(xc_code_c, is_corr=True)
         if len(xc_parsed_x[1]) != 0:
             raise KeyError("Advanced correlation contribution should be defined in exchange part of xc code!")
         return xc_parsed_x[0] + ", " + xc_parsed_c[0], xc_parsed_c[1], xc_parsed_x[2] + xc_parsed_c[2]
@@ -358,7 +392,7 @@ def parse_dh_xc_code_string(xc_code, is_corr=False):
             xc_other.append(xc_info)
         else:
             assert False
-    xc_hyb = " + ".join(xc_hyb).strip().upper()
+    xc_hyb = " + ".join(xc_hyb).strip().upper().replace(" + - ", " - ")
     # post process advanced correlations
     dict_xc_adv = dict()
     for key, val in xc_adv:
@@ -368,3 +402,39 @@ def parse_dh_xc_code_string(xc_code, is_corr=False):
             dict_xc_adv[key] = tuple(np.array(val) + np.array(dict_xc_adv[key]))
     xc_adv = list(dict_xc_adv.items())
     return xc_hyb, xc_adv, xc_other
+
+
+def parse_dh_xc_code(xc_code, is_scf):
+    """ Parse functional description for doubly hybrid functional.
+
+    Parameters
+    ----------
+    xc_code : str
+        String representation of functional description.
+        Can be either detailed description or common name.
+    is_scf : bool
+        Self-consistent
+
+    Returns
+    -------
+    tuple
+        Parsed xc code of 3 parts: hybrid, advanced correlation, other.
+
+    See Also
+    --------
+    parse_dh_xc_code_detailed
+    """
+    if isinstance(xc_code, tuple):
+        xc_code = xc_code[0] if is_scf else xc_code[1]
+    xc_code_normed = re.sub("[-_ ]", "", xc_code).upper()
+    if xc_code_normed in XC_DH_NORMED_SET:
+        xc_info = XC_DH_MAP[XC_DH_NORMED_SET[xc_code_normed]]
+        if isinstance(xc_info, tuple):
+            xc_code = xc_info[0] if is_scf else xc_info[1]
+        else:
+            xc_code = xc_info
+    xc_parsed = parse_dh_xc_code_detailed(xc_code)
+    if is_scf:
+        return xc_parsed[0], [], []
+    else:
+        return xc_parsed

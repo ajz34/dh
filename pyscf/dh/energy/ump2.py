@@ -127,12 +127,12 @@ def kernel_energy_ump2_conv_full_incore(
     Cv = [mo_coeff[s][:, nocc[s]:] for s in (0, 1)]
     eo = [mo_energy[s][:nocc[s]] for s in (0, 1)]
     ev = [mo_energy[s][nocc[s]:] for s in (0, 1)]
-    log.debug1("Start ao2mo")
+    log.debug("Start ao2mo")
     g_iajb = [np.array([])] * 3
     for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
         g_iajb[ss] = ao2mo.general(ao_eri, (Co[s0], Cv[s0], Co[s1], Cv[s1])) \
                           .reshape(nocc[s0], nvir[s0], nocc[s1], nvir[s1])
-        log.debug1("Spin {:}{:} ao2mo finished".format(s0, s1))
+        log.debug("Spin {:}{:} ao2mo finished".format(s0, s1))
 
     # prepare t_ijab space
     incore_t_ijab = util.parse_incore_flag(
@@ -254,12 +254,12 @@ def kernel_energy_ump2_ri(
 
     # loops
     eng_spin = np.array([0, 0, 0], dtype=Y_ov[0].dtype)
-    log.debug1("Start RI-MP2 loop")
+    log.debug("Start RI-MP2 loop")
     nbatch = util.calc_batch_size(4 * max(nocc) * max(nvir) ** 2, max_memory, dtype=Y_ov[0].dtype)
     for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
-        log.debug1("Starting spin {:}{:}".format(s0, s1))
+        log.debug("Starting spin {:}{:}".format(s0, s1))
         for sI in util.gen_batch(0, nocc[s0], nbatch):
-            log.debug1("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
+            log.debug("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
             if Y_ov_2 is None:
                 g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[s0][:, sI], Y_ov[s1])
             else:

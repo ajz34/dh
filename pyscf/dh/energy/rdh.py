@@ -13,8 +13,8 @@ class RDH(lib.StreamObject):
     """ Restricted doubly hybrid class. """
     mf: dft.rks.RKS
     """ Self consistent object. """
-    xc_dh: str
-    """ Exchange-correlation code for energy evaluation of doubly hybrid functional. """
+    xc: str or tuple
+    """ Doubly hybrid functional exchange-correlation code. """
     params: Params
     """ Params object consisting of flags, tensors and results. """
     df_ri: df.DF or None
@@ -24,21 +24,36 @@ class RDH(lib.StreamObject):
     siepa_screen: callable
     """ Screen function for sIEPA. """
 
-    def __init__(self, mf_or_xc=NotImplemented, xc_dh=None, params=None, df_ri=None):
-        if isinstance(mf_or_xc, str):
-            raise NotImplementedError
+    def __init__(self, mf_or_mol, xc, params=None, df_ri=None):
+        # generate mf object
+        if isinstance(mf_or_mol, gto.Mole):
+            mol = mf_or_mol
+            if self.restricted:
+                mf = dft.RKS(mol, xc=util.parse_dh_xc_code(xc, is_scf=True)[0]).density_fit(df.aug_etb(mol))
+            else:
+                mf = dft.UKS(mol, xc=util.parse_dh_xc_code(xc, is_scf=True)[0]).density_fit(df.aug_etb(mol))
         else:
-            mf = mf_or_xc
-
+            mf = mf_or_mol
         self.mf = mf
         log = lib.logger.new_logger(verbose=self.mol.verbose)
-        if not self.mf.converged:
+        # transform mf if pyscf.scf instead of pyscf.dft
+        if self.mf.e_tot != 0 and not self.mf.converged:
             log.warn("SCF not converged!")
         if not hasattr(mf, "xc"):
             log.warn("We only accept density functionals here.\n"
                      "If you pass an HF instance, we convert to KS object naively.")
             self.mf = self.mf.to_rks("HF") if self.restricted else self.mf.to_uks("HF")
-            self.mf.initialize_grids(self.mol, self.mf.make_rdm1())
+        # parse xc code
+        if util.parse_dh_xc_code(xc, is_scf=True)[0].upper() != self.mf.xc.upper():
+            log.warn("xc code for SCF functional is not the same from input and SCF object!\n" +
+                     "Input xc for SCF: {:}\n".format(util.parse_dh_xc_code(xc, is_scf=True)[0]) +
+                     "SCF object xc   : {:}\n".format(self.mf.xc) +
+                     "Input xc for eng: {:}\n".format(xc if isinstance(xc, str) else xc[1]) +
+                     "Use SCF object xc for SCF functional, input xc for eng as energy functional.")
+            self.xc = self.mf.xc, (xc if isinstance(xc, str) else xc[1])
+        else:
+            self.xc = xc
+        # parse density fitting object
         self.df_ri = df_ri
         if self.df_ri is None and hasattr(mf, "with_df"):
             self.df_ri = mf.with_df
@@ -46,7 +61,7 @@ class RDH(lib.StreamObject):
             log.warn("Density-fitting object not found. "
                      "Generate a pyscf.df.DF object by default aug-etb settings.")
             self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
-
+        # parse other objects
         if params:
             self.params = params
         else:
@@ -56,6 +71,10 @@ class RDH(lib.StreamObject):
         self.verbose = self.mol.verbose
         self.log = lib.logger.new_logger(verbose=self.verbose)
         self.siepa_screen = erfc
+
+    def build(self):
+        if self.mo_coeff is None:
+            self.mf.run()
 
     @property
     def mol(self) -> gto.Mole:
@@ -139,6 +158,11 @@ class RDH(lib.StreamObject):
         """ Molecular orbital energy (with frozen core). """
         return self.mo_energy[self.get_mask_act()]
 
+    @property
+    def e_tot(self) -> float:
+        """ Doubly hybrid total energy (obtained after running ``driver_energy_dh``). """
+        return self.params.results["eng_dh_{:}".format(self.xc)]
+
     def get_Y_ov_f(self, regenerate=False) -> np.ndarray:
         """ Get cholesky decomposed ERI in MO basis (occ-vir part with frozen core).
 
@@ -146,11 +170,11 @@ class RDH(lib.StreamObject):
         """
         nmo_f, nocc_f = self.nmo_f, self.nocc_f
         if regenerate or "Y_ov_f" not in self.params.tensors:
-            self.log.log("[INFO] Generating `Y_ov_f` ...")
+            self.log.info("[INFO] Generating `Y_ov_f` ...")
             Y_ov_f = util.get_cderi_mo(self.df_ri, self.mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
                                        self.mol.max_memory - lib.current_memory()[0])
             self.params.tensors["Y_ov_f"] = Y_ov_f
-            self.log.log("[INFO] Generating `Y_ov_f` Done")
+            self.log.info("[INFO] Generating `Y_ov_f` Done")
         else:
             Y_ov_f = self.params.tensors["Y_ov_f"]
         return Y_ov_f
@@ -158,3 +182,4 @@ class RDH(lib.StreamObject):
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa
     driver_energy_dh = driver_energy_dh
+    kernel = driver_energy_dh

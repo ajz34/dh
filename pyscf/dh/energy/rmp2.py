@@ -137,7 +137,7 @@ def kernel_energy_rmp2_conv_full_incore(
     Cv = mo_coeff[:, nocc:]
     eo = mo_energy[:nocc]
     ev = mo_energy[nocc:]
-    log.debug1("Start ao2mo")
+    log.debug("Start ao2mo")
     g_iajb = ao2mo.general(ao_eri, (Co, Cv, Co, Cv)).reshape(nocc, nvir, nocc, nvir)
 
     # prepare t_ijab space
@@ -153,7 +153,7 @@ def kernel_energy_rmp2_conv_full_incore(
     # loops
     eng_bi1 = eng_bi2 = 0
     for i in range(nocc):
-        log.debug1("MP2 loop i: {:}".format(i))
+        log.debug("MP2 loop i: {:}".format(i))
         g_Iajb = g_iajb[i]
         D_Ijab = eo[i] + eo[:, None, None] - ev[None, :, None] - ev[None, None, :]
         t_Ijab = lib.einsum("ajb, jab -> jab", g_Iajb, 1 / D_Ijab)
@@ -169,7 +169,7 @@ def kernel_energy_rmp2_conv_full_incore(
             eng_bi2 += lib.einsum("jab, bja ->", t_Ijab.conj(), g_Iajb)
     eng_bi1 = util.check_real(eng_bi1)
     eng_bi2 = util.check_real(eng_bi2)
-    log.debug1("MP2 energy computation finished.")
+    log.debug("MP2 energy computation finished.")
     # report
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2
@@ -230,8 +230,6 @@ def kernel_energy_rmp2_ri(
     purpose of this function should only be benchmark.
     """
     log = lib.logger.new_logger(verbose=verbose)
-    log.warn("Conventional integral of MP2 is not recommended!\n"
-             "Use density fitting approximation is recommended.")
 
     naux, nocc, nvir = Y_ov.shape
     if frac_num:
@@ -252,11 +250,11 @@ def kernel_energy_rmp2_ri(
             "t_ijab", shape=(nocc, nocc, nvir, nvir), incore=incore_t_ijab, dtype=Y_ov.dtype)
 
     # loops
-    log.debug1("Start RI-MP2 loop")
+    log.debug("Start RI-MP2 loop")
     nbatch = util.calc_batch_size(4 * nocc * nvir ** 2, max_memory, dtype=Y_ov.dtype)
     eng_bi1 = eng_bi2 = 0
     for sI in util.gen_batch(0, nocc, nbatch):
-        log.debug1("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
+        log.debug("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
         if Y_ov_2 is None:
             g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov)
         else:
@@ -276,7 +274,7 @@ def kernel_energy_rmp2_ri(
             eng_bi2 += lib.einsum("Ijab, Ibja ->", t_Ijab.conj(), g_Iajb)
     eng_bi1 = util.check_real(eng_bi1)
     eng_bi2 = util.check_real(eng_bi2)
-    log.debug1("MP2 energy computation finished.")
+    log.debug("MP2 energy computation finished.")
     # report
     eng_os = eng_bi1
     eng_ss = eng_bi1 - eng_bi2

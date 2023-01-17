@@ -1,7 +1,7 @@
 import typing
 
 from pyscf.dh import util
-from pyscf import dft
+from pyscf import dft, lib
 import numpy as np
 
 if typing.TYPE_CHECKING:
@@ -9,30 +9,32 @@ if typing.TYPE_CHECKING:
     from pyscf import gto
 
 
-def driver_energy_dh(mf_dh, xc_code):
+def driver_energy_dh(mf_dh):
     """ Driver of multiple exchange-correlation energy component evaluation.
 
     Parameters
     ----------
     mf_dh : RDH
         Object of doubly hybrid (restricted).
-    xc_code : str
-        Exchange-correlation code. Doubly hybrid components can be included in xc code.
     """
+    xc = mf_dh.xc
     log = mf_dh.log
-    xc_pure, xc_adv_list, xc_other_list = util.parse_dh_xc_code_string(xc_code)
-    log.debug1("pure xc: " + str(xc_pure))
-    log.debug1("advanced xc: " + str(xc_adv_list))
-    log.debug1("other xc: " + str(xc_other_list))
+    if mf_dh.mf.mo_coeff is None:
+        log.warn("SCF object is not initialized. Build DH object (run SCF) first.")
+        mf_dh.build()
+    xc_hyb, xc_adv_list, xc_other_list = util.parse_dh_xc_code(xc, is_scf=False)
+    log.debug("pure xc: " + str(xc_hyb))
+    log.debug("advanced xc: " + str(xc_adv_list))
+    log.debug("other xc: " + str(xc_other_list))
     ni = dft.numint.NumInt()
     result = dict()
     eng_tot = 0.
     # 0. noxc part
     result.update(kernel_energy_restricted_noxc(mf_dh.mf, mf_dh.mf.make_rdm1()))
     eng_tot += result["eng_noxc"]
-    # 1. parse energy of xc_pure
+    # 1. parse energy of xc_hyb
     # exact exchange
-    omega, alpha, hyb = ni.rsh_and_hybrid_coeff(xc_pure)
+    omega, alpha, hyb = ni.rsh_and_hybrid_coeff(xc_hyb)
     if abs(omega) > 1e-10:
         result.update(kernel_energy_restricted_exactx(mf_dh.mf, mf_dh.mf.make_rdm1(), omega))
         eng_tot += (alpha - hyb) * result["eng_LR_HF({:})".format(omega)]
@@ -40,42 +42,38 @@ def driver_energy_dh(mf_dh, xc_code):
         result.update(kernel_energy_restricted_exactx(mf_dh.mf, mf_dh.mf.make_rdm1()))
         eng_tot += hyb * result["eng_HF".format(omega)]
     # general xc
-    if xc_pure != "":
+    if xc_hyb != "":
         grids = mf_dh.mf.grids
         rho = get_rho(mf_dh.mol, grids, mf_dh.mf.make_rdm1())
-        result.update(kernel_energy_purexc([xc_pure], rho, grids.weights, mf_dh.restricted))
-        eng_tot += result["eng_purexc_{:}".format(xc_pure)]
+        result.update(kernel_energy_purexc([xc_hyb], rho, grids.weights, mf_dh.restricted))
+        eng_tot += result["eng_purexc_{:}".format(xc_hyb)]
     # 2. advanced correlation (5th-rung)
     for xc_key, xc_param in xc_adv_list:
         if xc_key == "MP2":
             with mf_dh.params.temporary_flags({"coef_os": xc_param[0], "coef_ss": xc_param[1]}):
                 mf_dh.driver_energy_mp2()
-                result["eng_MP2"] = mf_dh.params.results["eng_mp2"]
-                eng_tot += result["eng_MP2"]
+                eng_tot += mf_dh.params.results["eng_MP2"]
         elif xc_key in ["MP2CR", "MP2CR2", "IEPA", "SIEPA"]:
             with mf_dh.params.temporary_flags({
                     "coef_os": xc_param[0], "coef_ss": xc_param[1], "iepa_scheme": xc_key}):
                 mf_dh.driver_energy_iepa()
-                eng_tot += result["eng_{:}".format(xc_key)]
+                eng_tot += mf_dh.params.results["eng_{:}".format(xc_key)]
     # 3. other xc cases
     for xc_other in xc_other_list:
         if xc_other[0] == "VV10":
             # vv10
             fac, nlc_pars = xc_other[1:]
             grids = mf_dh.mf.grids
-            rho = get_rho(mf_dh.mol, grids, mf_dh.mf.make_rdm1())
             nlcgrids = mf_dh.mf.nlcgrids
-            nlcgrids.build()
-            vvrho = get_rho(mf_dh.mol, nlcgrids, mf_dh.mf.make_rdm1())
-            exc_vv10, _ = dft.numint._vv10nlc(rho, grids.coords, vvrho, nlcgrids.weights, nlcgrids.coords, nlc_pars)
-            eng_vv10 = (rho[0] * grids.weights * exc_vv10).sum()
-            result["eng_VV10({:}; {:})".format(*nlc_pars)] = eng_vv10
+            result.update(kernel_energy_vv10(mf_dh.mol, mf_dh.mf.make_rdm1(), nlc_pars, grids, nlcgrids,
+                                             verbose=mf_dh.verbose))
+            eng_vv10 = result["eng_VV10({:}; {:})".format(*nlc_pars)]
             eng_tot += fac * eng_vv10
         else:
             raise KeyError("Currently only VV10 is accepted as other special component of xc.")
     # finalize
-    result["eng_dh_{:}".format(xc_code)] = eng_tot
-    log.log("[RESULT] Energy of xc {:}: {:20.12f}".format(xc_code, eng_tot))
+    result["eng_dh_{:}".format(xc)] = eng_tot
+    log.note("[RESULT] Energy of xc {:}: {:20.12f}".format(xc, eng_tot))
     mf_dh.params.update_results(result)
     return mf_dh
 
@@ -207,3 +205,23 @@ def kernel_energy_purexc(xc_list, rho, weights, restricted):
         exc = ni.eval_xc(xc, rho, spin=spin, deriv=0)[0]
         results["eng_purexc_" + xc] = exc @ wrho0
     return results
+
+
+def kernel_energy_vv10(mol, dm, nlc_pars, grids=None, nlcgrids=None, verbose=None):
+    log = lib.logger.new_logger(verbose=verbose)
+    if grids is None:
+        log.warn("VV10 grids not found. Use default grids of PySCF for VV10.")
+        grids = dft.Grids(mol).build()
+    rho = get_rho(mol, grids, dm)
+    if nlcgrids is None:
+        nlcgrids = grids
+        vvrho = rho
+    else:
+        nlcgrids.build()
+        vvrho = get_rho(mol, nlcgrids, dm)
+    exc_vv10, _ = dft.numint._vv10nlc(rho, grids.coords, vvrho, nlcgrids.weights, nlcgrids.coords, nlc_pars)
+    eng_vv10 = (rho[0] * grids.weights * exc_vv10).sum()
+    result = dict()
+    result["eng_VV10({:}; {:})".format(*nlc_pars)] = eng_vv10
+    return result
+

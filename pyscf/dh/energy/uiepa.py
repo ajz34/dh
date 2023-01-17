@@ -119,13 +119,13 @@ def kernel_energy_uiepa_ri(
         schemes_for_pair.add("MP2")
 
     for ssn, s0, s1 in [("aa", 0, 0), ("ab", 0, 1), ("bb", 1, 1)]:
-        log.debug1("In IEPA kernel, spin {:}".format(ssn))
+        log.debug("In IEPA kernel, spin {:}".format(ssn))
         is_same_spin = s0 == s1
         D_ab = - ev[s0][:, None] - ev[s1][None, :]
         for I in range(nocc[s0]):
             maxJ = I if is_same_spin else nocc[s1]
             for J in range(maxJ):
-                log.debug1("In IEPA kernel, pair ({:}, {:})".format(I, J))
+                log.debug("In IEPA kernel, pair ({:}, {:})".format(I, J))
                 D_IJab = eo[s0][I] + eo[s1][J] + D_ab
                 g_IJab = Y_ov[s0][:, I].T @ Y_ov[s1][:, J]  # PIa, PJb -> IJab
                 if is_same_spin:

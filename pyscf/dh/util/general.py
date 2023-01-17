@@ -372,9 +372,9 @@ class Params:
                     raise KeyError("Overwrite results is not allowed!\n"
                                    "Repeated keys: [{:}]".format(", ".join(keys_interset)))
                 if warn_overwrite:
-                    warnings.warn("Some keys are overwrited when updating results dictionary.\n"
-                                  "Use this result with caution! It's recommended to repeat computation without "
-                                  "calling multiple drivers.\n"
-                                  "Repeated keys: [{:}]".format(", ".join(keys_interset)))
+                    msg = "Key result overwrited!\n"
+                    for key in keys_interset:
+                        msg += "Key: `{:}`, before {:}, after {:}".format(key, income_result[key], self.results[key])
+                        warnings.warn(msg)
         self.results.update(income_result)
         return self
