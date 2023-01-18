@@ -30,22 +30,22 @@ def driver_energy_dh(mf_dh):
     result = dict()
     eng_tot = 0.
     # 0. noxc part
-    result.update(kernel_energy_restricted_noxc(mf_dh.mf, mf_dh.mf.make_rdm1()))
+    result.update(mf_dh.kernel_energy_noxc(mf_dh.mf, mf_dh.mf.make_rdm1()))
     eng_tot += result["eng_noxc"]
     # 1. parse energy of xc_hyb
     # exact exchange
     omega, alpha, hyb = ni.rsh_and_hybrid_coeff(xc_hyb)
     if abs(omega) > 1e-10:
-        result.update(kernel_energy_restricted_exactx(mf_dh.mf, mf_dh.mf.make_rdm1(), omega))
+        result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.mf.make_rdm1(), omega))
         eng_tot += (alpha - hyb) * result["eng_LR_HF({:})".format(omega)]
     if abs(hyb) > 1e-10:
-        result.update(kernel_energy_restricted_exactx(mf_dh.mf, mf_dh.mf.make_rdm1()))
+        result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.mf.make_rdm1()))
         eng_tot += hyb * result["eng_HF".format(omega)]
     # general xc
     if xc_hyb != "":
         grids = mf_dh.mf.grids
         rho = get_rho(mf_dh.mol, grids, mf_dh.mf.make_rdm1())
-        result.update(kernel_energy_purexc([xc_hyb], rho, grids.weights, mf_dh.restricted))
+        result.update(mf_dh.kernel_energy_purexc([xc_hyb], rho, grids.weights, mf_dh.restricted))
         eng_tot += result["eng_purexc_{:}".format(xc_hyb)]
     # 2. advanced correlation (5th-rung)
     for xc_key, xc_param in xc_adv_list:
@@ -65,8 +65,9 @@ def driver_energy_dh(mf_dh):
             fac, nlc_pars = xc_other[1:]
             grids = mf_dh.mf.grids
             nlcgrids = mf_dh.mf.nlcgrids
-            result.update(kernel_energy_vv10(mf_dh.mol, mf_dh.mf.make_rdm1(), nlc_pars, grids, nlcgrids,
-                                             verbose=mf_dh.verbose))
+            result.update(
+                mf_dh.kernel_energy_vv10(mf_dh.mol, mf_dh.mf.make_rdm1(), nlc_pars, grids, nlcgrids,
+                                         verbose=mf_dh.verbose))
             eng_vv10 = result["eng_VV10({:}; {:})".format(*nlc_pars)]
             eng_tot += fac * eng_vv10
         else:
@@ -219,9 +220,12 @@ def kernel_energy_vv10(mol, dm, nlc_pars, grids=None, nlcgrids=None, verbose=Non
     else:
         nlcgrids.build()
         vvrho = get_rho(mol, nlcgrids, dm)
+    # handle unrestricted case
+    if len(rho.shape) == 3:
+        rho = rho[0] + rho[1]
+        vvrho = vvrho[0] + vvrho[1]
     exc_vv10, _ = dft.numint._vv10nlc(rho, grids.coords, vvrho, nlcgrids.weights, nlcgrids.coords, nlc_pars)
     eng_vv10 = (rho[0] * grids.weights * exc_vv10).sum()
     result = dict()
     result["eng_VV10({:}; {:})".format(*nlc_pars)] = eng_vv10
     return result
-

@@ -1,12 +1,12 @@
+from pyscf import lib
+import numpy as np
+from typing import List
+
 from pyscf.dh.energy.rdh import RDH
 from pyscf.dh.energy.ump2 import driver_energy_ump2
 from pyscf.dh.energy.uiepa import driver_energy_uiepa
 from pyscf.dh import util
-
-from pyscf import lib
-import numpy as np
-
-from typing import List
+from pyscf.dh.energy.udft import kernel_energy_unrestricted_exactx, kernel_energy_unrestricted_noxc
 
 
 class UDH(RDH):
@@ -80,3 +80,6 @@ class UDH(RDH):
 
     driver_energy_mp2 = driver_energy_ump2
     driver_energy_iepa = driver_energy_uiepa
+
+    kernel_energy_exactx = staticmethod(kernel_energy_unrestricted_exactx)
+    kernel_energy_noxc = staticmethod(kernel_energy_unrestricted_noxc)

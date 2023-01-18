@@ -53,10 +53,12 @@ def driver_energy_rmp2(mf_dh):
     frac_num_f = frac_num[mask_act] if frac_num else None
     # MP2 kernels
     if mf_dh.params.flags["integral_scheme"].lower() == "conv":
-        ao_eri = mf_dh.mf._eri
+        eri_or_mol = mf_dh.mf._eri
+        if eri_or_mol is None:
+            eri_or_mol = mol
         results = kernel_energy_rmp2_conv_full_incore(
             mf_dh.params,
-            mo_energy_f, mo_coeff_f, ao_eri, nocc_f, nvir_f,
+            mo_energy_f, mo_coeff_f, eri_or_mol, nocc_f, nvir_f,
             c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             max_memory=mol.max_memory - lib.current_memory()[0],
@@ -83,7 +85,7 @@ def driver_energy_rmp2(mf_dh):
 
 
 def kernel_energy_rmp2_conv_full_incore(
-        params, mo_energy, mo_coeff, ao_eri,
+        params, mo_energy, mo_coeff, eri_or_mol,
         nocc, nvir,
         c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=None):
     """ Kernel of restricted MP2 energy by conventional method.
@@ -98,7 +100,7 @@ def kernel_energy_rmp2_conv_full_incore(
         Molecular orbital energy levels.
     mo_coeff : np.ndarray
         Molecular coefficients.
-    ao_eri : np.ndarray
+    eri_or_mol : np.ndarray or gto.Mole
         ERI that is recognized by ``pyscf.ao2mo.general``.
 
     nocc : int
@@ -138,7 +140,7 @@ def kernel_energy_rmp2_conv_full_incore(
     eo = mo_energy[:nocc]
     ev = mo_energy[nocc:]
     log.debug("Start ao2mo")
-    g_iajb = ao2mo.general(ao_eri, (Co, Cv, Co, Cv)).reshape(nocc, nvir, nocc, nvir)
+    g_iajb = ao2mo.general(eri_or_mol, (Co, Cv, Co, Cv)).reshape(nocc, nvir, nocc, nvir)
 
     # prepare t_ijab space
     incore_t_ijab = util.parse_incore_flag(
