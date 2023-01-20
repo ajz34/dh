@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass
 from contextlib import contextmanager
 
-from typing import List, Tuple
+from typing import List
 
 
 class RestrictedDataset(h5py.Dataset):
@@ -81,7 +81,7 @@ class HybridDict(dict):
         self.chkfile_name = chkfile_name
         self.chkfile = h5py.File(self.chkfile_name, "r+")
 
-    def create(self, name, data=None, incore=True, shape=None, dtype=np.float64, **kwargs):
+    def create(self, name, data=None, incore=True, shape=None, dtype=None, **kwargs):
         """
         Create an tensor by h5py style
 
@@ -103,7 +103,7 @@ class HybridDict(dict):
         shape : Tuple[int, ...]
            Tensor shape if scheme 2, tuple like; otherwise leave it to None
         dtype : type
-            Tesor data type (np.float32, int, etc)
+            Tesor data type (np.float64, int, etc)
 
         Returns
         -------
@@ -114,7 +114,13 @@ class HybridDict(dict):
             raise ValueError("Provide either data or shape!")
         if data is not None and shape is not None:
             raise ValueError("Data and shape shouldn't be provided together!")
+        if dtype is None:
+            if data is not None:
+                dtype = data.dtype
+            else:
+                dtype = np.float64
         if name in self:
+            warnings.warn("Key name {:} in tensor is to be overwriten.".format(name))
             try:  # don't create a new space if tensor already exists
                 # data provided or shape not aligned is not considered here
                 if shape and isinstance(self[name], h5py.Dataset) == (not incore):

@@ -40,12 +40,12 @@ def driver_energy_riepa(mf_dh):
     c_os = mf_dh.params.flags["coef_os"]
     c_ss = mf_dh.params.flags["coef_ss"]
     # parse frozen orbitals
-    mo_energy_f = mf_dh.mo_energy_f
+    mo_energy_act = mf_dh.mo_energy_act
     # generate ri-eri
-    Y_ov_f = mf_dh.get_Y_ov_f()
+    Y_ov_act = mf_dh.get_Y_ov_act()
     # kernel
     results = kernel_energy_riepa_ri(
-        mf_dh.params, mo_energy_f, Y_ov_f,
+        mf_dh.params, mo_energy_act, Y_ov_act,
         c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose

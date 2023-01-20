@@ -8,9 +8,9 @@ class TestRMP2(unittest.TestCase):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
 
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
-            mf.driver_energy_mp2()
+            mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.273944755130888))
 
@@ -18,12 +18,19 @@ class TestRMP2(unittest.TestCase):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
 
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
-            mf.driver_energy_mp2()
+            mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.2602324295391498))
+
+        mf = dh.energy.RDH(mf_s, xc="MP2")
+        mf.params.flags["frozen_list"] = [0, 2]
+        with mf.params.temporary_flags({"integral_scheme": "conv"}):
+            mf.run()
+        print(mf.params.results)
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.13840970089836263))
 
     def test_rmp2_conv_giao(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -55,9 +62,9 @@ class TestRMP2(unittest.TestCase):
         mf_s._eri = mol.intor("int2e") + np.einsum("tuvkl, t -> uvkl", eri_1_B, dev_xyz_B)
         mf_s.run()
 
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         with mf.params.temporary_flags({"integral_scheme": "conv"}):
-            mf.driver_energy_mp2()
+            mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27425584824874516))
 
@@ -65,10 +72,10 @@ class TestRMP2(unittest.TestCase):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
 
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
-            mf.driver_energy_mp2()
+            mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27393741308994124))
 
@@ -76,13 +83,20 @@ class TestRMP2(unittest.TestCase):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
 
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
-            mf.driver_energy_mp2()
+            mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.2602250917785774))
+
+        mf = dh.energy.RDH(mf_s, xc="MP2")
+        mf.params.flags["frozen_list"] = [0, 2]
+        with mf.params.temporary_flags({"integral_scheme": "ri"}):
+            mf.run()
+        print(mf.params.results)
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.13839934020349923))
 
     def test_rmp2_ri_giao(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
@@ -123,13 +137,13 @@ class TestRMP2(unittest.TestCase):
         int3c2e_ig1_cd = np.linalg.solve(L, int3c2e_ig1.reshape(3 * mol.nao**2, -1).T).reshape(-1, 3, mol.nao, mol.nao)
         int3c2e_2_cd = int3c2e_cd + 2 * lib.einsum("Ptuv, t -> Puv", -1j * int3c2e_ig1_cd, dev_xyz_B)
 
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         mf.df_ri._cderi = int3c2e_cd
         mf.df_ri_2 = df.DF(mol, df.aug_etb(mol))
         mf.df_ri_2._cderi = int3c2e_2_cd
 
         with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True}):
-            mf.driver_energy_mp2()
+            mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.27424683619063206))

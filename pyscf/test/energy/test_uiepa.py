@@ -87,7 +87,7 @@ class TestUIEPA(unittest.TestCase):
         mf_s = scf.UHF(mol)
         # mf_s.conv_tol_grad = 1e-10
         mf_s.run()
-        mf = dh.energy.UDH(mf_s)
+        mf = dh.energy.UDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["mp2cr", "dcpt2", "iepa", "siepa"]}):
             mf.driver_energy_iepa()
@@ -101,7 +101,7 @@ class TestUIEPA(unittest.TestCase):
         mol = gto.Mole(atom="N; N 1 3", basis="cc-pVTZ", charge=1, spin=1).build()
         mf_s = scf.UHF(mol).run()
         print(mf_s.converged)
-        mf = dh.energy.UDH(mf_s)
+        mf = dh.energy.UDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["siepa"]}):
             mf.driver_energy_iepa()

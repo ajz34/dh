@@ -69,6 +69,24 @@ None
     If tensor size exceeds this size (in MBytes), then store in disk.
 """
 
+incore_resp_eri = "auto"
+""" Flag for tensor :math:`{}^\\mathrm{Exx} A_{ij}^{ab}` stored in memory or disk.
+
+Exx here refers to exact exchange contribution in response tensor :math:`A_{ij}^{ab}`.
+This includes HF contribution (for hybrids), or LR_HF contribution (for range-separates). 
+
+Parameters
+----------
+True
+    Store tensor in memory.
+False
+    Store tensor in disk.
+"auto"
+    Leave program to judge whether tensor locates.
+(int)
+    If tensor size exceeds this size (in MBytes), then store in disk.
+"""
+
 integral_scheme = "ri"
 """ Flag for MP2 integral.
 

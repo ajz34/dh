@@ -30,21 +30,21 @@ def driver_energy_dh(mf_dh):
     result = dict()
     eng_tot = 0.
     # 0. noxc part
-    result.update(mf_dh.kernel_energy_noxc(mf_dh.mf, mf_dh.mf.make_rdm1()))
+    result.update(mf_dh.kernel_energy_noxc(mf_dh.mf, mf_dh.make_rdm1_scf()))
     eng_tot += result["eng_noxc"]
     # 1. parse energy of xc_hyb
     # exact exchange
     omega, alpha, hyb = ni.rsh_and_hybrid_coeff(xc_hyb)
     if abs(omega) > 1e-10:
-        result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.mf.make_rdm1(), omega))
+        result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.make_rdm1_scf(), omega))
         eng_tot += (alpha - hyb) * result["eng_LR_HF({:})".format(omega)]
     if abs(hyb) > 1e-10:
-        result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.mf.make_rdm1()))
+        result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.make_rdm1_scf()))
         eng_tot += hyb * result["eng_HF".format(omega)]
     # general xc
     if xc_hyb != "":
         grids = mf_dh.mf.grids
-        rho = get_rho(mf_dh.mol, grids, mf_dh.mf.make_rdm1())
+        rho = get_rho(mf_dh.mol, grids, mf_dh.make_rdm1_scf())
         result.update(mf_dh.kernel_energy_purexc([xc_hyb], rho, grids.weights, mf_dh.restricted))
         eng_tot += result["eng_purexc_{:}".format(xc_hyb)]
     # 2. advanced correlation (5th-rung)
@@ -66,7 +66,7 @@ def driver_energy_dh(mf_dh):
             grids = mf_dh.mf.grids
             nlcgrids = mf_dh.mf.nlcgrids
             result.update(
-                mf_dh.kernel_energy_vv10(mf_dh.mol, mf_dh.mf.make_rdm1(), nlc_pars, grids, nlcgrids,
+                mf_dh.kernel_energy_vv10(mf_dh.mol, mf_dh.make_rdm1_scf(), nlc_pars, grids, nlcgrids,
                                          verbose=mf_dh.verbose))
             eng_vv10 = result["eng_VV10({:}; {:})".format(*nlc_pars)]
             eng_tot += fac * eng_vv10

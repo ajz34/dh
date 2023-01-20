@@ -8,7 +8,7 @@ class TestRIEPA(unittest.TestCase):
     def test_rmp2_ri(self):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": "mp2"}):
             mf.driver_energy_iepa()
@@ -97,7 +97,7 @@ class TestRIEPA(unittest.TestCase):
         mf_s = scf.RHF(mol)
         mf_s.conv_tol_grad = 1e-10
         mf_s.run()
-        mf = dh.energy.RDH(mf_s)
+        mf = dh.energy.RDH(mf_s, xc="MP2")
         mf.df_ri = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"]}):
             mf.driver_energy_iepa()

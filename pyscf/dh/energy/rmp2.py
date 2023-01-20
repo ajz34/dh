@@ -47,9 +47,9 @@ def driver_energy_rmp2(mf_dh):
     frac_num = mf_dh.params.flags["frac_num"]
     # parse frozen orbitals
     mask_act = mf_dh.get_mask_act()
-    nmo_f, nocc_f, nvir_f = mf_dh.nmo_f, mf_dh.nocc_f, mf_dh.nvir_f
-    mo_coeff_f = mf_dh.mo_coeff_f
-    mo_energy_f = mf_dh.mo_energy_f
+    nact, nOcc, nVir = mf_dh.nact, mf_dh.nOcc, mf_dh.nVir
+    mo_coeff_act = mf_dh.mo_coeff_act
+    mo_energy_act = mf_dh.mo_energy_act
     frac_num_f = frac_num[mask_act] if frac_num else None
     # MP2 kernels
     if mf_dh.params.flags["integral_scheme"].lower() == "conv":
@@ -58,21 +58,21 @@ def driver_energy_rmp2(mf_dh):
             eri_or_mol = mol
         results = kernel_energy_rmp2_conv_full_incore(
             mf_dh.params,
-            mo_energy_f, mo_coeff_f, eri_or_mol, nocc_f, nvir_f,
+            mo_energy_act, mo_coeff_act, eri_or_mol, nOcc, nVir,
             c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             max_memory=mol.max_memory - lib.current_memory()[0],
             verbose=mf_dh.verbose)
         mf_dh.params.update_results(results)
     elif mf_dh.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
-        Y_ov_f = mf_dh.get_Y_ov_f()
+        Y_ov_act = mf_dh.get_Y_ov_act()
         Y_ov_2_f = None
         if mf_dh.df_ri_2 is not None:
-            Y_ov_2_f = util.get_cderi_mo(mf_dh.df_ri_2, mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
+            Y_ov_2_f = util.get_cderi_mo(mf_dh.df_ri_2, mo_coeff_act, None, (0, nOcc, nOcc, nact),
                                          mol.max_memory - lib.current_memory()[0])
         results = kernel_energy_rmp2_ri(
             mf_dh.params,
-            mo_energy_f, Y_ov_f,
+            mo_energy_act, Y_ov_act,
             c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf_dh.verbose,

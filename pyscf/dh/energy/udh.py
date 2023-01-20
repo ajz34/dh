@@ -41,42 +41,100 @@ class UDH(RDH):
             self.params.tensors["mask_act"] = mask_act
         return self.params.tensors["mask_act"]
 
+    def get_shuffle_frz(self, regenerate=False) -> np.ndarray:
+        if regenerate or "shuffle_frz" not in self.params.tensors:
+            mask_act = self.get_mask_act(regenerate=regenerate)
+            mo_idx = np.arange(self.nmo)
+            nocc = self.nocc
+            shuffle_frz_occ = [np.concatenate([mo_idx[~mask_act[s]][:nocc[s]], mo_idx[mask_act[s]][:nocc[s]]])
+                               for s in (0, 1)]
+            shuffle_frz_vir = [np.concatenate([mo_idx[mask_act[s]][nocc[s]:], mo_idx[~mask_act[s]][nocc[s]:]])
+                               for s in (0, 1)]
+            shuffle_frz = np.array([np.concatenate([shuffle_frz_occ[s], shuffle_frz_vir[s]]) for s in (0, 1)])
+            self.params.tensors.create("shuffle_frz", shuffle_frz)
+            if not np.allclose(shuffle_frz[0], np.arange(self.nmo)) \
+                    or not np.allclose(shuffle_frz[1], np.arange(self.nmo)):
+                self.log.warn("MO orbital indices will be shuffled.")
+        return self.params.tensors["shuffle_frz"]
+
     @property
-    def nmo_f(self) -> List[int]:
+    def nCore(self) -> List[int]:
+        """ Number of frozen occupied orbitals. """
+        mask_act = self.get_mask_act()
+        return [(~mask_act[s][:self.nocc[s]]).sum() for s in (0, 1)]
+
+    @property
+    def nOcc(self) -> List[int]:
+        """ Number of active occupied orbitals. """
+        mask_act = self.get_mask_act()
+        return [mask_act[s][:self.nocc[s]].sum() for s in (0, 1)]
+
+    @property
+    def nVir(self) -> List[int]:
+        """ Number of active virtual orbitals. """
+        mask_act = self.get_mask_act()
+        return [mask_act[s][self.nocc[s]:].sum() for s in (0, 1)]
+
+    @property
+    def nFrzvir(self) -> List[int]:
+        """ Number of inactive virtual orbitals. """
+        mask_act = self.get_mask_act()
+        return [(~mask_act[s][self.nocc[s]:]).sum() for s in (0, 1)]
+
+    @property
+    def nact(self) -> List[int]:
         return [self.get_mask_act()[s].sum() for s in (0, 1)]
 
-    @property
-    def nocc_f(self) -> List[int]:
-        return [self.get_mask_act()[s][:self.nocc[s]].sum() for s in (0, 1)]
+    def get_idx_frz_categories(self) -> List[tuple]:
+        """ Get indices of molecular orbital categories.
+
+        This function returns 4 numbers:
+        [(nCore, nCore + nOcc, nCore + nOcc + nVir, nmo)_alpha, ..._beta]
+        """
+        return [(self.nCore[s], self.nocc[s], self.nocc[s] + self.nVir[s], self.nmo) for s in (0, 1)]
 
     @property
-    def nvir_f(self) -> List[int]:
-        return [self.get_mask_act()[s][self.nocc[s]:].sum() for s in (0, 1)]
+    def mo_coeff(self) -> np.ndarray:
+        """ Molecular orbital coefficient. """
+        shuffle_frz = self.get_shuffle_frz()
+        return np.array([self.mf.mo_coeff[s][:, shuffle_frz[s]] for s in (0, 1)])
 
     @property
-    def mo_coeff_f(self) -> List[np.ndarray]:
-        return [self.mo_coeff[s][:, self.get_mask_act()[s]] for s in (0, 1)]
+    def mo_occ(self) -> np.ndarray:
+        """ Molecular orbital occupation number. """
+        shuffle_frz = self.get_shuffle_frz()
+        return np.array([self.mf.mo_occ[s][shuffle_frz[s]] for s in (0, 1)])
 
     @property
-    def mo_energy_f(self) -> List[np.ndarray]:
-        return [self.mo_energy[s][self.get_mask_act()[s]] for s in (0, 1)]
+    def mo_energy(self) -> np.ndarray:
+        """ Molecular orbital energy. """
+        shuffle_frz = self.get_shuffle_frz()
+        return np.array([self.mf.mo_energy[s][shuffle_frz[s]] for s in (0, 1)])
 
-    def get_Y_ov_f(self, regenerate=False) -> List[np.ndarray]:
+    @property
+    def mo_coeff_act(self) -> List[np.ndarray]:
+        return [self.mo_coeff[s][:, self.nCore[s]:self.nCore[s]+self.nact[s]] for s in (0, 1)]
+
+    @property
+    def mo_energy_act(self) -> List[np.ndarray]:
+        return [self.mo_energy[s][self.nCore[s]:self.nCore[s]+self.nact[s]] for s in (0, 1)]
+
+    def get_Y_ov_act(self, regenerate=False) -> List[np.ndarray]:
         """ Get cholesky decomposed ERI in MO basis (occ-vir part with frozen core).
 
-        Dimension: (naux, nocc_f, nvir_f) for each spin.
+        Dimension: (naux, nOcc, nVir) for each spin.
         """
-        nmo_f, nocc_f = self.nmo_f, self.nocc_f
-        if regenerate or "Y_ov_f" not in self.params.tensors:
-            Y_ov_f = [util.get_cderi_mo(
-                self.df_ri, self.mo_coeff_f[s], None, (0, nocc_f[s], nocc_f[s], nmo_f[s]),
+        nact, nOcc = self.nact, self.nOcc
+        if regenerate or "Y_ov_act" not in self.params.tensors:
+            Y_ov_act = [util.get_cderi_mo(
+                self.df_ri, self.mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
                 self.mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
-            self.params.tensors["Y_ov_f_a"] = Y_ov_f[0]
-            self.params.tensors["Y_ov_f_b"] = Y_ov_f[1]
+            self.params.tensors["Y_ov_act_a"] = Y_ov_act[0]
+            self.params.tensors["Y_ov_act_b"] = Y_ov_act[1]
         else:
-            Y_ov_f = [self.params.tensors["Y_ov_f_a"], self.params.tensors["Y_ov_f_b"]]
-        return Y_ov_f
+            Y_ov_act = [self.params.tensors["Y_ov_act_a"], self.params.tensors["Y_ov_act_b"]]
+        return Y_ov_act
 
     driver_energy_mp2 = driver_energy_ump2
     driver_energy_iepa = driver_energy_uiepa

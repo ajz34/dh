@@ -28,6 +28,11 @@ class RDH(lib.StreamObject):
     """ Screen function for sIEPA. """
 
     def __init__(self, mf_or_mol, xc, params=None, df_ri=None):
+        # initialize parameters
+        if params:
+            self.params = params
+        else:
+            self.params = Params(util.get_default_options(), HybridDict(), {})
         # generate mf object
         if isinstance(mf_or_mol, gto.Mole):
             mol = mf_or_mol
@@ -46,6 +51,8 @@ class RDH(lib.StreamObject):
             log.warn("We only accept density functionals here.\n"
                      "If you pass an HF instance, we convert to KS object naively.")
             self.mf = self.mf.to_rks("HF") if self.restricted else self.mf.to_uks("HF")
+            if self.mf.grids.weights is None:
+                self.mf.initialize_grids()
         # parse xc code
         if util.parse_dh_xc_code(xc, is_scf=True)[0].upper() != self.mf.xc.upper():
             log.warn("xc code for SCF functional is not the same from input and SCF object!\n" +
@@ -65,10 +72,6 @@ class RDH(lib.StreamObject):
                      "Generate a pyscf.df.DF object by default aug-etb settings.")
             self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
         # parse other objects
-        if params:
-            self.params = params
-        else:
-            self.params = Params(util.get_default_options(), HybridDict(), {})
 
         self.df_ri_2 = None
         self.verbose = self.mol.verbose
@@ -76,28 +79,15 @@ class RDH(lib.StreamObject):
         self.siepa_screen = erfc
 
     def build(self):
-        if self.mo_coeff is None:
+        if self.mf.mo_coeff is None:
             self.mf.run()
+        if self.mf.grids.weights is None:
+            self.mf.initialize_grids(dm=self.make_rdm1_scf())
 
     @property
     def mol(self) -> gto.Mole:
         """ Molecular object. """
         return self.mf.mol
-
-    @property
-    def mo_coeff(self) -> np.ndarray:
-        """ Molecular orbital coefficient. """
-        return self.mf.mo_coeff
-
-    @property
-    def mo_occ(self) -> np.ndarray:
-        """ Molecular orbital occupation number. """
-        return self.mf.mo_occ
-
-    @property
-    def mo_energy(self) -> np.ndarray:
-        """ Molecular orbital energy. """
-        return self.mf.mo_energy
 
     @property
     def nao(self) -> int:
@@ -107,7 +97,7 @@ class RDH(lib.StreamObject):
     @property
     def nmo(self) -> int:
         """ Number of molecular orbitals. """
-        return self.mo_coeff.shape[-1]
+        return self.mf.mo_coeff.shape[-1]
 
     @property
     def nocc(self) -> int:
@@ -133,54 +123,121 @@ class RDH(lib.StreamObject):
             frozen_rule = self.params.flags["frozen_rule"]
             frozen_list = self.params.flags["frozen_list"]
             mask_act = util.parse_frozen_list(self.mol, self.nmo, frozen_list, frozen_rule)
-            self.params.tensors["mask_act"] = mask_act
+            self.params.tensors.create("mask_act", mask_act)
         return self.params.tensors["mask_act"]
 
+    def get_shuffle_frz(self, regenerate=False) -> np.ndarray:
+        """ Get shuffle indices array for frozen orbitals.
+
+        For example, if orbitals 0, 2 are frozen, then this array will reshuffle
+        MO orbitals to (0, 2, 1, 3, 4, ...).
+        """
+        if regenerate or "shuffle_frz" not in self.params.tensors:
+            mask_act = self.get_mask_act(regenerate=regenerate)
+            mo_idx = np.arange(self.nmo)
+            nocc = self.nocc
+            shuffle_frz_occ = np.concatenate([mo_idx[~mask_act][:nocc], mo_idx[mask_act][:nocc]])
+            shuffle_frz_vir = np.concatenate([mo_idx[mask_act][nocc:], mo_idx[~mask_act][nocc:]])
+            shuffle_frz = np.concatenate([shuffle_frz_occ, shuffle_frz_vir])
+            self.params.tensors.create("shuffle_frz", shuffle_frz)
+            if not np.allclose(shuffle_frz, np.arange(self.nmo)):
+                self.log.warn("MO orbital indices will be shuffled.")
+        return self.params.tensors["shuffle_frz"]
+
     @property
-    def nmo_f(self) -> int:
-        """ Number of molecular orbitals (with frozen core). """
+    def nCore(self) -> int:
+        """ Number of frozen occupied orbitals. """
+        mask_act = self.get_mask_act()
+        return (~mask_act[:self.nocc]).sum()
+
+    @property
+    def nOcc(self) -> int:
+        """ Number of active occupied orbitals. """
+        mask_act = self.get_mask_act()
+        return mask_act[:self.nocc].sum()
+
+    @property
+    def nVir(self) -> int:
+        """ Number of active virtual orbitals. """
+        mask_act = self.get_mask_act()
+        return mask_act[self.nocc:].sum()
+
+    @property
+    def nFrzvir(self) -> int:
+        """ Number of inactive virtual orbitals. """
+        mask_act = self.get_mask_act()
+        return (~mask_act[self.nocc:]).sum()
+
+    @property
+    def nact(self) -> int:
+        """ Number of active molecular orbitals. """
         return self.get_mask_act().sum()
 
-    @property
-    def nocc_f(self) -> int:
-        """ Number of occupied orbitals (with frozen core). """
-        return self.get_mask_act()[:self.nocc].sum()
+    def get_idx_frz_categories(self) -> tuple:
+        """ Get indices of molecular orbital categories.
+
+        This function returns 4 numbers:
+        (nCore, nCore + nOcc, nCore + nOcc + nVir, nmo)
+        """
+        return self.nCore, self.nocc, self.nocc + self.nVir, self.nmo
 
     @property
-    def nvir_f(self) -> int:
-        """ Number of virtual orbitals (with frozen core). """
-        return self.nmo_f - self.nocc_f
+    def mo_coeff(self) -> np.ndarray:
+        """ Molecular orbital coefficient. """
+        shuffle_frz = self.get_shuffle_frz()
+        return self.mf.mo_coeff[:, shuffle_frz]
 
     @property
-    def mo_coeff_f(self) -> np.ndarray:
+    def mo_occ(self) -> np.ndarray:
+        """ Molecular orbital occupation number. """
+        shuffle_frz = self.get_shuffle_frz()
+        return self.mf.mo_occ[shuffle_frz]
+
+    @property
+    def mo_energy(self) -> np.ndarray:
+        """ Molecular orbital energy. """
+        shuffle_frz = self.get_shuffle_frz()
+        return self.mf.mo_energy[shuffle_frz]
+
+    def make_rdm1_scf(self, mo_coeff=None, mo_occ=None):
+        if mo_coeff is None:
+            mo_coeff = self.mo_coeff
+        if mo_occ is None:
+            mo_occ = self.mo_occ
+        dm = self.mf.make_rdm1(mo_coeff=mo_coeff, mo_occ=mo_occ)
+        return dm
+
+    @property
+    def mo_coeff_act(self) -> np.ndarray:
         """ Molecular orbital coefficient (with frozen core). """
-        return self.mo_coeff[:, self.get_mask_act()]
+        return self.mo_coeff[:, self.nCore:self.nCore+self.nact]
 
     @property
-    def mo_energy_f(self) -> np.ndarray:
+    def mo_energy_act(self) -> np.ndarray:
         """ Molecular orbital energy (with frozen core). """
-        return self.mo_energy[self.get_mask_act()]
+        return self.mo_energy[self.nCore:self.nCore+self.nact]
 
     @property
     def e_tot(self) -> float:
         """ Doubly hybrid total energy (obtained after running ``driver_energy_dh``). """
         return self.params.results["eng_dh_{:}".format(self.xc)]
 
-    def get_Y_ov_f(self, regenerate=False) -> np.ndarray:
+    def get_Y_ov_act(self, regenerate=False) -> np.ndarray:
         """ Get cholesky decomposed ERI in MO basis (occ-vir part with frozen core).
 
-        Dimension: (naux, nocc_f, nvir_f)
+        Dimension: (naux, nOcc, nVir)
         """
-        nmo_f, nocc_f = self.nmo_f, self.nocc_f
-        if regenerate or "Y_ov_f" not in self.params.tensors:
-            self.log.info("[INFO] Generating `Y_ov_f` ...")
-            Y_ov_f = util.get_cderi_mo(self.df_ri, self.mo_coeff_f, None, (0, nocc_f, nocc_f, nmo_f),
-                                       self.mol.max_memory - lib.current_memory()[0])
-            self.params.tensors["Y_ov_f"] = Y_ov_f
-            self.log.info("[INFO] Generating `Y_ov_f` Done")
+        nact, nOcc = self.nact, self.nOcc
+        if regenerate or "Y_ov_act" not in self.params.tensors:
+            self.log.info("[INFO] Generating `Y_ov_act` ...")
+            Y_ov_act = util.get_cderi_mo(
+                self.df_ri, self.mo_coeff_act, None, (0, nOcc, nOcc, nact),
+                self.mol.max_memory - lib.current_memory()[0])
+            self.params.tensors["Y_ov_act"] = Y_ov_act
+            self.log.info("[INFO] Generating `Y_ov_act` Done")
         else:
-            Y_ov_f = self.params.tensors["Y_ov_f"]
-        return Y_ov_f
+            Y_ov_act = self.params.tensors["Y_ov_act"]
+        return Y_ov_act
 
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa
