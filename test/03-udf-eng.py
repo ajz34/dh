@@ -1,4 +1,4 @@
-from dh import DFDH
+from pyscf.dh import DFDH
 from pyscf import gto, dft, mp, df
 import numpy as np
 

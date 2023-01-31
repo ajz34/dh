@@ -1,5 +1,5 @@
 from deriv_numerical import DipoleDerivGenerator, NumericDiff
-from dh import DFDH
+from pyscf.dh import DFDH
 from pyscf import gto, scf
 import numpy as np
 
@@ -45,8 +45,8 @@ if __name__ == '__main__':
     de = DFDH(mol, xc).run().dipole()
     print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
     # HF                     True 7.595880797683918e-07
-    xc = ["HF", "HF", 0, 1, 1]    # should not be used in actual program! dh does not check situation cc == 0
-    nde = NumericDiff(DipoleDerivGenerator(mol_to_eng_wrapper(mol, xc))).derivative + dip_nuc
-    de = DFDH(mol, xc).run().dipole()
-    print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
+    # xc = ["HF", "HF", 0, 1, 1]    # should not be used in actual program! dh does not check situation cc == 0
+    # nde = NumericDiff(DipoleDerivGenerator(mol_to_eng_wrapper(mol, xc))).derivative + dip_nuc
+    # de = DFDH(mol, xc).run().dipole()
+    # print(np.allclose(nde, de, atol=1e-5, rtol=1e-4), abs(nde - de).max())
 

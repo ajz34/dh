@@ -1,6 +1,6 @@
 from pyscf import gto, dft
-from dh import DFDH
-from dh.dhutil import TicToc
+from pyscf.dh import DFDH
+from pyscf.dh.dhutil import TicToc
 import numpy as np
 
 np.set_printoptions(5, suppress=True, linewidth=180)

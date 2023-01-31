@@ -1,5 +1,5 @@
 from deriv_numerical import NucCoordDerivGenerator, NumericDiff
-from dh import DFDH
+from pyscf.dh import DFDH
 from pyscf import gto, scf
 import numpy as np
 
