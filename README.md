@@ -76,6 +76,13 @@ A reminder to experienced PySCF users is that, the library
 [cuanto/libdftd3](https://github.com/cuanto/libdftd3). So please do not copy your old `libdftd3.so`
 to extension `pyscf/dftd3`.
 
+### Deprecation Notice
+
+Version 0.1.3 of this extension `dh` corresponds to PySCF versions before 2022.
+For newer PySCF versions, `dh` v0.1.3 will not work due to code change of `pyscf.dft.numint.cache_xc_kernel`.
+
+Version 0.1.4 of this extension `dh` corresponds to newer PySCF versions (v2.1.0).
+
 
 ## Availibility and Limitations
 

@@ -16,14 +16,11 @@ NAME         = 'pyscf-dh'
 DESCRIPTION  = 'Doubly-hybrid methods for PySCF'
 VERSION      = '0.1.4'
 ACKNOWLEDGE  = 'Xin Xu (supervisor and group leader), ' \
-               'Igor Ying Zhang (igor-1982), ' \
-               'Neil Qiang Su, ' \
-               'Yonghao Gu (yonghaogu), ' \
-               'Wenjie Yan, ' \
-               'Yangyang Jin (UltraJINX), ' \
-               'Shirong Wang (hebrewsnabla), ' \
-               'PySCF Developers'
+               'PySCF Developers, ' \
+               'Igor Ying Zhang (igor1982), Neil Qiang Su, ' \
+               'Yonghao Gu, Wenjie Yan, Yangyang Jin (UltraJINX), Shirong Wang (hebrewsnabla)'
 AUTHOR       = 'Zhenyu Zhu (ajz34)'
+CONRTIBUTER  = 'Shirong Wnag (hebrewsnabla)'
 AUTHOR_EMAIL = 'ajz34@outlook.com'
 DEPENDENCIES = ['pyscf', 'numpy', 'h5py']
 
