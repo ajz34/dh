@@ -7,7 +7,7 @@ import warnings
 from typing import List
 
 
-def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=0):
+def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=1):
     """ Calculate batch size within possible memory.
 
     For example, if we want to compute tensor (100, 100, 100), but only 50,000 memory available,
@@ -57,6 +57,7 @@ def calc_batch_size(unit_flop, mem_avail, pre_flop=0, dtype=float, min_batch=0):
             warnings.warn(warning_token)
 
     batch_size = int(max(max_mb / unit_mb, unit_mb))
+    batch_size = max(batch_size, min_batch)
     return batch_size
 
 

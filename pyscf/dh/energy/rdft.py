@@ -208,7 +208,7 @@ def kernel_energy_purexc(xc_list, rho, weights, restricted):
     return results
 
 
-def kernel_energy_vv10(mol, dm, nlc_pars, grids=None, nlcgrids=None, verbose=None):
+def kernel_energy_vv10(mol, dm, nlc_pars, grids=None, nlcgrids=None, verbose=lib.logger.NOTE):
     log = lib.logger.new_logger(verbose=verbose)
     if grids is None:
         log.warn("VV10 grids not found. Use default grids of PySCF for VV10.")

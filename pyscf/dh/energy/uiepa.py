@@ -31,9 +31,9 @@ def driver_energy_uiepa(mf_dh):
     c_ss = mf_dh.params.flags["coef_ss"]
     mo_energy_act = mf_dh.mo_energy_act
     # generate ri-eri
-    Y_ov_act = mf_dh.get_Y_ov_act()
+    Y_OV = mf_dh.get_Y_OV()
     results = kernel_energy_uiepa_ri(
-        mf_dh.params, mo_energy_act, Y_ov_act,
+        mf_dh.params, mo_energy_act, Y_OV,
         c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
@@ -42,10 +42,10 @@ def driver_energy_uiepa(mf_dh):
 
 
 def kernel_energy_uiepa_ri(
-        params, mo_energy, Y_ov,
+        params, mo_energy, Y_OV,
         c_os=1., c_ss=1., screen_func=erfc,
         thresh=1e-10, max_cycle=64,
-        verbose=None):
+        verbose=lib.logger.NOTE):
     """ Kernel of restricted IEPA-like methods.
 
     Parameters of these methods are controled by flags.
@@ -58,7 +58,7 @@ def kernel_energy_uiepa_ri(
         Tensors will be updated to store pair energies and norms (MP2/cr).
     mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
-    Y_ov : list[np.ndarray]
+    Y_OV : list[np.ndarray]
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
 
     c_os : float
@@ -80,8 +80,8 @@ def kernel_energy_uiepa_ri(
     """
     log = lib.logger.new_logger(verbose=verbose)
     nocc, nvir = np.array([0, 0]), np.array([0, 0])
-    naux, nocc[0], nvir[0] = Y_ov[0].shape
-    naux, nocc[1], nvir[1] = Y_ov[1].shape
+    naux, nocc[0], nvir[0] = Y_OV[0].shape
+    naux, nocc[1], nvir[1] = Y_OV[1].shape
     eo = [mo_energy[s][:nocc[s]] for s in (0, 1)]
     ev = [mo_energy[s][nocc[s]:] for s in (0, 1)]
 
@@ -127,7 +127,7 @@ def kernel_energy_uiepa_ri(
             for J in range(maxJ):
                 log.debug("In IEPA kernel, pair ({:}, {:})".format(I, J))
                 D_IJab = eo[s0][I] + eo[s1][J] + D_ab
-                g_IJab = Y_ov[s0][:, I].T @ Y_ov[s1][:, J]  # PIa, PJb -> IJab
+                g_IJab = Y_OV[s0][:, I].T @ Y_OV[s1][:, J]  # PIa, PJb -> IJab
                 if is_same_spin:
                     g_IJab = g_IJab - g_IJab.T
                 # evaluate pair energy for different schemes

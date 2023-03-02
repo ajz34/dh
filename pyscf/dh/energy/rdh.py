@@ -222,22 +222,22 @@ class RDH(lib.StreamObject):
         """ Doubly hybrid total energy (obtained after running ``driver_energy_dh``). """
         return self.params.results["eng_dh_{:}".format(self.xc)]
 
-    def get_Y_ov_act(self, regenerate=False) -> np.ndarray:
+    def get_Y_OV(self, regenerate=False) -> np.ndarray:
         """ Get cholesky decomposed ERI in MO basis (occ-vir part with frozen core).
 
         Dimension: (naux, nOcc, nVir)
         """
         nact, nOcc = self.nact, self.nOcc
-        if regenerate or "Y_ov_act" not in self.params.tensors:
-            self.log.info("[INFO] Generating `Y_ov_act` ...")
-            Y_ov_act = util.get_cderi_mo(
+        if regenerate or "Y_OV" not in self.params.tensors:
+            self.log.info("[INFO] Generating `Y_OV` ...")
+            Y_OV = util.get_cderi_mo(
                 self.df_ri, self.mo_coeff_act, None, (0, nOcc, nOcc, nact),
                 self.mol.max_memory - lib.current_memory()[0])
-            self.params.tensors["Y_ov_act"] = Y_ov_act
-            self.log.info("[INFO] Generating `Y_ov_act` Done")
+            self.params.tensors["Y_OV"] = Y_OV
+            self.log.info("[INFO] Generating `Y_OV` Done")
         else:
-            Y_ov_act = self.params.tensors["Y_ov_act"]
-        return Y_ov_act
+            Y_OV = self.params.tensors["Y_OV"]
+        return Y_OV
 
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa

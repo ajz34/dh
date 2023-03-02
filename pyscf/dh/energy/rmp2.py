@@ -65,19 +65,19 @@ def driver_energy_rmp2(mf_dh):
             verbose=mf_dh.verbose)
         mf_dh.params.update_results(results)
     elif mf_dh.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
-        Y_ov_act = mf_dh.get_Y_ov_act()
-        Y_ov_2_f = None
+        Y_OV = mf_dh.get_Y_OV()
+        Y_OV_2 = None
         if mf_dh.df_ri_2 is not None:
-            Y_ov_2_f = util.get_cderi_mo(mf_dh.df_ri_2, mo_coeff_act, None, (0, nOcc, nOcc, nact),
+            Y_OV_2 = util.get_cderi_mo(mf_dh.df_ri_2, mo_coeff_act, None, (0, nOcc, nOcc, nact),
                                          mol.max_memory - lib.current_memory()[0])
         results = kernel_energy_rmp2_ri(
             mf_dh.params,
-            mo_energy_act, Y_ov_act,
+            mo_energy_act, Y_OV,
             c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf_dh.verbose,
             max_memory=mol.max_memory - lib.current_memory()[0],
-            Y_ov_2=Y_ov_2_f)
+            Y_OV_2=Y_OV_2)
         mf_dh.params.update_results(results)
     else:
         raise NotImplementedError("Not implemented currently!")
@@ -87,7 +87,7 @@ def driver_energy_rmp2(mf_dh):
 def kernel_energy_rmp2_conv_full_incore(
         params, mo_energy, mo_coeff, eri_or_mol,
         nocc, nvir,
-        c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=None):
+        c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=lib.logger.NOTE):
     """ Kernel of restricted MP2 energy by conventional method.
 
     Parameters
@@ -190,8 +190,8 @@ def kernel_energy_rmp2_conv_full_incore(
 
 
 def kernel_energy_rmp2_ri(
-        params, mo_energy, Y_ov,
-        c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
+        params, mo_energy, Y_OV,
+        c_os=1., c_ss=1., frac_num=None, verbose=lib.logger.NOTE, max_memory=2000, Y_OV_2=None):
     """ Kernel of MP2 energy by RI integral.
 
     For RI approximation, ERI integral is set to be
@@ -207,7 +207,7 @@ def kernel_energy_rmp2_ri(
         Tensors will be updated to store ``t_ijab`` if required.
     mo_energy : np.ndarray
         Molecular orbital energy levels.
-    Y_ov : np.ndarray
+    Y_OV : np.ndarray
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
 
     c_os : float
@@ -220,7 +220,7 @@ def kernel_energy_rmp2_ri(
         Verbose level for PySCF.
     max_memory : float
         Allocatable memory in MB.
-    Y_ov_2 : np.ndarray
+    Y_OV_2 : np.ndarray
         Another part of 3c2e ERI in MO basis (occ-vir part). This is mostly used in magnetic computations.
 
     Notes
@@ -233,7 +233,7 @@ def kernel_energy_rmp2_ri(
     """
     log = lib.logger.new_logger(verbose=verbose)
 
-    naux, nocc, nvir = Y_ov.shape
+    naux, nocc, nvir = Y_OV.shape
     if frac_num:
         frac_occ, frac_vir = frac_num[:nocc], frac_num[nocc:]
     else:
@@ -244,24 +244,24 @@ def kernel_energy_rmp2_ri(
     # prepare t_ijab space
     incore_t_ijab = util.parse_incore_flag(
         params.flags["incore_t_ijab"], nocc**2 * nvir**2,
-        max_memory, dtype=Y_ov.dtype)
+        max_memory, dtype=Y_OV.dtype)
     if incore_t_ijab is None:
         t_ijab = None
     else:
         t_ijab = params.tensors.create(
-            "t_ijab", shape=(nocc, nocc, nvir, nvir), incore=incore_t_ijab, dtype=Y_ov.dtype)
+            "t_ijab", shape=(nocc, nocc, nvir, nvir), incore=incore_t_ijab, dtype=Y_OV.dtype)
 
     # loops
     log.debug("Start RI-MP2 loop")
-    nbatch = util.calc_batch_size(4 * nocc * nvir ** 2, max_memory, dtype=Y_ov.dtype)
+    nbatch = util.calc_batch_size(4 * nocc * nvir ** 2, max_memory, dtype=Y_OV.dtype)
     eng_bi1 = eng_bi2 = 0
     for sI in util.gen_batch(0, nocc, nbatch):
         log.debug("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
-        if Y_ov_2 is None:
-            g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov)
+        if Y_OV_2 is None:
+            g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_OV[:, sI], Y_OV)
         else:
-            g_Iajb = 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov[:, sI], Y_ov_2)
-            g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov_2[:, sI], Y_ov)
+            g_Iajb = 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_OV[:, sI], Y_OV_2)
+            g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_OV_2[:, sI], Y_OV)
         D_Ijab = eo[sI, None, None, None] + eo[None, :, None, None] - ev[None, None, :, None] - ev[None, None, None, :]
         t_Ijab = lib.einsum("Iajb, Ijab -> Ijab", g_Iajb, 1 / D_Ijab)
         if t_ijab is not None:

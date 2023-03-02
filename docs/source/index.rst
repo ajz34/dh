@@ -12,7 +12,8 @@ Welcome to dh's documentation!
 
    programmer/usage_params.ipynb
    programmer/usage_hybriddict.ipynb
-   programmer/programmer_additional.md
+   programmer/coding_tips.ipynb
+   programmer/convention.ipynb
 
 .. toctree::
    :maxdepth: 1

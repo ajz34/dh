@@ -119,22 +119,22 @@ class UDH(RDH):
     def mo_energy_act(self) -> List[np.ndarray]:
         return [self.mo_energy[s][self.nCore[s]:self.nCore[s]+self.nact[s]] for s in (0, 1)]
 
-    def get_Y_ov_act(self, regenerate=False) -> List[np.ndarray]:
+    def get_Y_OV(self, regenerate=False) -> List[np.ndarray]:
         """ Get cholesky decomposed ERI in MO basis (occ-vir part with frozen core).
 
         Dimension: (naux, nOcc, nVir) for each spin.
         """
         nact, nOcc = self.nact, self.nOcc
-        if regenerate or "Y_ov_act" not in self.params.tensors:
-            Y_ov_act = [util.get_cderi_mo(
+        if regenerate or "Y_OV" not in self.params.tensors:
+            Y_OV = [util.get_cderi_mo(
                 self.df_ri, self.mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
                 self.mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
-            self.params.tensors["Y_ov_act_a"] = Y_ov_act[0]
-            self.params.tensors["Y_ov_act_b"] = Y_ov_act[1]
+            self.params.tensors["Y_OV_a"] = Y_OV[0]
+            self.params.tensors["Y_OV_b"] = Y_OV[1]
         else:
-            Y_ov_act = [self.params.tensors["Y_ov_act_a"], self.params.tensors["Y_ov_act_b"]]
-        return Y_ov_act
+            Y_OV = [self.params.tensors["Y_OV_a"], self.params.tensors["Y_OV_b"]]
+        return Y_OV
 
     driver_energy_mp2 = driver_energy_ump2
     driver_energy_iepa = driver_energy_uiepa

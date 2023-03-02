@@ -42,10 +42,10 @@ def driver_energy_riepa(mf_dh):
     # parse frozen orbitals
     mo_energy_act = mf_dh.mo_energy_act
     # generate ri-eri
-    Y_ov_act = mf_dh.get_Y_ov_act()
+    Y_OV = mf_dh.get_Y_OV()
     # kernel
     results = kernel_energy_riepa_ri(
-        mf_dh.params, mo_energy_act, Y_ov_act,
+        mf_dh.params, mo_energy_act, Y_OV,
         c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
@@ -54,10 +54,10 @@ def driver_energy_riepa(mf_dh):
 
 
 def kernel_energy_riepa_ri(
-        params, mo_energy, Y_ov,
+        params, mo_energy, Y_OV,
         c_os=1., c_ss=1., screen_func=erfc,
         thresh=1e-10, max_cycle=64,
-        verbose=None):
+        verbose=lib.logger.NOTE):
     """ Kernel of restricted IEPA-like methods.
 
     Parameters of these methods are controled by flags.
@@ -70,7 +70,7 @@ def kernel_energy_riepa_ri(
         Tensors will be updated to store pair energies and norms (MP2/cr).
     mo_energy : np.ndarray
         Molecular orbital energy levels.
-    Y_ov : np.ndarray
+    Y_OV : np.ndarray
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
 
     c_os : float
@@ -95,7 +95,7 @@ def kernel_energy_riepa_ri(
     - ``norm_METHOD``: normalization factors of ``MP2CR`` or ``MP2CR2``.
     """
     log = lib.logger.new_logger(verbose=verbose)
-    naux, nocc, nvir = Y_ov.shape
+    naux, nocc, nvir = Y_OV.shape
     eo = mo_energy[:nocc]
     ev = mo_energy[nocc:]
 
@@ -136,7 +136,7 @@ def kernel_energy_riepa_ri(
         for J in range(I + 1):
             log.debug("In IEPA kernel, pair ({:}, {:})".format(I, J))
             D_IJab = eo[I] + eo[J] + D_ab
-            g_IJab = Y_ov[:, I].T @ Y_ov[:, J]  # PIa, PJb -> IJab
+            g_IJab = Y_OV[:, I].T @ Y_OV[:, J]  # PIa, PJb -> IJab
             g_IJab_asym = g_IJab - g_IJab.T
             # evaluate pair energy for different schemes
             for scheme in schemes_for_pair:

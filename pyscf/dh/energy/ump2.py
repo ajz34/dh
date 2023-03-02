@@ -49,20 +49,20 @@ def driver_energy_ump2(mf_dh):
             verbose=mf_dh.verbose)
         mf_dh.params.update_results(result)
     elif mf_dh.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
-        Y_ov_act = mf_dh.get_Y_ov_act()
-        Y_ov_2_f = None
+        Y_OV = mf_dh.get_Y_OV()
+        Y_OV_2 = None
         if mf_dh.df_ri_2 is not None:
-            Y_ov_2_f = [util.get_cderi_mo(
+            Y_OV_2 = [util.get_cderi_mo(
                 mf_dh.df_ri_2, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
                 mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
         result = kernel_energy_ump2_ri(
-            mf_dh.params, mo_energy_act, Y_ov_act,
+            mf_dh.params, mo_energy_act, Y_OV,
             c_os=c_os, c_ss=c_ss,
             frac_num=frac_num_f,
             verbose=mf_dh.verbose,
             max_memory=mol.max_memory - lib.current_memory()[0],
-            Y_ov_2=Y_ov_2_f
+            Y_OV_2=Y_OV_2
         )
         mf_dh.params.update_results(result)
     else:
@@ -73,7 +73,7 @@ def driver_energy_ump2(mf_dh):
 def kernel_energy_ump2_conv_full_incore(
         params, mo_energy, mo_coeff, eri_or_mol,
         nocc, nvir,
-        c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=None):
+        c_os=1., c_ss=1., frac_num=None, max_memory=2000, verbose=lib.logger.NOTE):
     """ Kernel of unrestricted MP2 energy by conventional method.
 
     Parameters
@@ -185,8 +185,8 @@ def kernel_energy_ump2_conv_full_incore(
 
 
 def kernel_energy_ump2_ri(
-        params, mo_energy, Y_ov,
-        c_os=1., c_ss=1., frac_num=None, verbose=None, max_memory=2000, Y_ov_2=None):
+        params, mo_energy, Y_OV,
+        c_os=1., c_ss=1., frac_num=None, verbose=lib.logger.NOTE, max_memory=2000, Y_OV_2=None):
     """ Kernel of unrestricted MP2 energy by RI integral.
 
     For RI approximation, ERI integral is set to be
@@ -202,7 +202,7 @@ def kernel_energy_ump2_ri(
         Tensors will be updated to store ``t_ijab`` if required.
     mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
-    Y_ov : list[np.ndarray]
+    Y_OV : list[np.ndarray]
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part). Spin in (aa, bb).
 
     c_os : float
@@ -215,7 +215,7 @@ def kernel_energy_ump2_ri(
         Verbose level for PySCF.
     max_memory : float
         Allocatable memory in MB.
-    Y_ov_2 : list[np.ndarray]
+    Y_OV_2 : list[np.ndarray]
         Another part of 3c2e ERI in MO basis (occ-vir part). This is mostly used in magnetic computations.
 
     Notes
@@ -228,8 +228,8 @@ def kernel_energy_ump2_ri(
     """
     log = lib.logger.new_logger(verbose=verbose)
     nocc, nvir = np.array([0, 0]), np.array([0, 0])
-    naux, nocc[0], nvir[0] = Y_ov[0].shape
-    naux, nocc[1], nvir[1] = Y_ov[1].shape
+    naux, nocc[0], nvir[0] = Y_OV[0].shape
+    naux, nocc[1], nvir[1] = Y_OV[1].shape
 
     if frac_num:
         frac_occ = [frac_num[s][:nocc[s]] for s in (0, 1)]
@@ -243,7 +243,7 @@ def kernel_energy_ump2_ri(
     # prepare t_ijab space
     incore_t_ijab = util.parse_incore_flag(
         params.flags["incore_t_ijab"], 3 * max(nocc) ** 2 * max(nvir) ** 2,
-        max_memory, dtype=Y_ov[0].dtype)
+        max_memory, dtype=Y_OV[0].dtype)
     if incore_t_ijab is None:
         t_ijab = None
     else:
@@ -252,21 +252,21 @@ def kernel_energy_ump2_ri(
             t_ijab[ss] = params.tensors.create(
                 "t_ijab_{:}".format(ssn),
                 shape=(nocc[s0], nocc[s1], nvir[s0], nvir[s1]), incore=incore_t_ijab,
-                dtype=Y_ov[0].dtype)
+                dtype=Y_OV[0].dtype)
 
     # loops
-    eng_spin = np.array([0, 0, 0], dtype=Y_ov[0].dtype)
+    eng_spin = np.array([0, 0, 0], dtype=Y_OV[0].dtype)
     log.debug("Start RI-MP2 loop")
-    nbatch = util.calc_batch_size(4 * max(nocc) * max(nvir) ** 2, max_memory, dtype=Y_ov[0].dtype)
+    nbatch = util.calc_batch_size(4 * max(nocc) * max(nvir) ** 2, max_memory, dtype=Y_OV[0].dtype)
     for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
         log.debug("Starting spin {:}{:}".format(s0, s1))
         for sI in util.gen_batch(0, nocc[s0], nbatch):
             log.debug("MP2 loop i: [{:}, {:})".format(sI.start, sI.stop))
-            if Y_ov_2 is None:
-                g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_ov[s0][:, sI], Y_ov[s1])
+            if Y_OV_2 is None:
+                g_Iajb = lib.einsum("PIa, Pjb -> Iajb", Y_OV[s0][:, sI], Y_OV[s1])
             else:
-                g_Iajb = 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov[s0][:, sI], Y_ov_2[s1])
-                g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_ov_2[s0][:, sI], Y_ov[s1])
+                g_Iajb = 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_OV[s0][:, sI], Y_OV_2[s1])
+                g_Iajb += 0.5 * lib.einsum("PIa, Pjb -> Iajb", Y_OV_2[s0][:, sI], Y_OV[s1])
             D_Ijab = (
                 + eo[s0][sI, None, None, None] + eo[s1][None, :, None, None]
                 - ev[s0][None, None, :, None] - ev[s1][None, None, None, :])
