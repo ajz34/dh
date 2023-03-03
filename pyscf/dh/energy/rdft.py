@@ -22,10 +22,8 @@ def driver_energy_dh(mf_dh):
     if mf_dh.mf.mo_coeff is None:
         log.warn("SCF object is not initialized. Build DH object (run SCF) first.")
         mf_dh.build()
-    xc_hyb, xc_adv_list, xc_other_list = util.parse_dh_xc_code(xc, is_scf=False)
-    log.debug("pure xc: " + str(xc_hyb))
-    log.debug("advanced xc: " + str(xc_adv_list))
-    log.debug("other xc: " + str(xc_other_list))
+    xc_info = util.parse_dh_xc_code(xc, is_scf=False)
+    xc_hyb = util.extract_xc_code_low_rung(xc_info)
     ni = dft.numint.NumInt()
     result = dict()
     eng_tot = 0.
@@ -47,8 +45,11 @@ def driver_energy_dh(mf_dh):
         rho = get_rho(mf_dh.mol, grids, mf_dh.make_rdm1_scf())
         result.update(mf_dh.kernel_energy_purexc([xc_hyb], rho, grids.weights, mf_dh.restricted))
         eng_tot += result["eng_purexc_{:}".format(xc_hyb)]
-    # 2. advanced correlation (5th-rung)
-    for xc_key, xc_param in xc_adv_list:
+    # 2. other correlation
+    for info in xc_info:
+        if info["low_rung"]:
+            continue
+        xc_key, xc_param = info["name"], info["parameters"]
         if xc_key == "MP2":
             with mf_dh.params.temporary_flags({"coef_os": xc_param[0], "coef_ss": xc_param[1]}):
                 mf_dh.driver_energy_mp2()
@@ -58,11 +59,8 @@ def driver_energy_dh(mf_dh):
                     "coef_os": xc_param[0], "coef_ss": xc_param[1], "iepa_scheme": xc_key}):
                 mf_dh.driver_energy_iepa()
                 eng_tot += mf_dh.params.results["eng_{:}".format(xc_key)]
-    # 3. other xc cases
-    for xc_other in xc_other_list:
-        if xc_other[0] == "VV10":
-            # vv10
-            fac, nlc_pars = xc_other[1:]
+        elif xc_key == "VV10":
+            fac, nlc_pars = info["fac"], info["parameters"]
             grids = mf_dh.mf.grids
             nlcgrids = mf_dh.mf.nlcgrids
             result.update(
@@ -71,7 +69,7 @@ def driver_energy_dh(mf_dh):
             eng_vv10 = result["eng_VV10({:}; {:})".format(*nlc_pars)]
             eng_tot += fac * eng_vv10
         else:
-            raise KeyError("Currently only VV10 is accepted as other special component of xc.")
+            raise KeyError("Unknown XC component {:}!".format(xc_key))
     # finalize
     result["eng_dh_{:}".format(xc)] = eng_tot
     log.note("[RESULT] Energy of xc {:}: {:20.12f}".format(xc, eng_tot))

@@ -34,12 +34,13 @@ class RDH(lib.StreamObject):
         else:
             self.params = Params(util.get_default_options(), HybridDict(), {})
         # generate mf object
+        xc_code_scf = util.extract_xc_code_low_rung(util.parse_dh_xc_code(xc, is_scf=True))
         if isinstance(mf_or_mol, gto.Mole):
             mol = mf_or_mol
             if self.restricted:
-                mf = dft.RKS(mol, xc=util.parse_dh_xc_code(xc, is_scf=True)[0]).density_fit(df.aug_etb(mol))
+                mf = dft.RKS(mol, xc=xc_code_scf).density_fit(df.aug_etb(mol))
             else:
-                mf = dft.UKS(mol, xc=util.parse_dh_xc_code(xc, is_scf=True)[0]).density_fit(df.aug_etb(mol))
+                mf = dft.UKS(mol, xc=xc_code_scf).density_fit(df.aug_etb(mol))
         else:
             mf = mf_or_mol
         self.mf = mf
@@ -54,7 +55,7 @@ class RDH(lib.StreamObject):
             if self.mf.grids.weights is None:
                 self.mf.initialize_grids()
         # parse xc code
-        if util.parse_dh_xc_code(xc, is_scf=True)[0].upper() != self.mf.xc.upper():
+        if xc_code_scf.upper() != self.mf.xc.upper():
             log.warn("xc code for SCF functional is not the same from input and SCF object!\n" +
                      "Input xc for SCF: {:}\n".format(util.parse_dh_xc_code(xc, is_scf=True)[0]) +
                      "SCF object xc   : {:}\n".format(self.mf.xc) +

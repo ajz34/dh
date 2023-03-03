@@ -521,6 +521,7 @@ def parse_dh_xc_code(xc_code, is_scf):
         else:
             xc_code = xc_info
     xc_parsed = parse_dh_xc_code_detailed(xc_code)
+    xc_parsed = handle_xc_code_pt2(xc_parsed)
     if is_scf:
         return [info for info in xc_parsed if info["low_rung"]]
     else:
