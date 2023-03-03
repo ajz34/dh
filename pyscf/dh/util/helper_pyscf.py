@@ -35,6 +35,8 @@ XC_DH_MAP = {   # [xc_for_scf (without advanced corr), xc_for_energy]
     "DSD_BLYP_D3": "0.71*HF + 0.29*B88, 0.54*LYP + 0.47*MP2_OS + 0.40*MP2_SS",
     "DSD_PBEB95_D3": "0.66*HF + 0.34*PBE, 0.55*B95 + 0.46*MP2_OS + 0.09*MP2_SS",
     "B2PLYP_D3": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
+    "ZRPS@PBE": ("PBE", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA_OS"),
+    "ZRPS@PBE0": ("PBE0", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA_OS"),
 }
 
 # upper xc dh common name without -, _, space
