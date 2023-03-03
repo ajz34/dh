@@ -1,6 +1,5 @@
 import inspect
 
-from pyscf import lib
 import numpy as np
 import warnings
 
@@ -141,50 +140,6 @@ def gen_leggauss_0_inf(ngrid):
 def gen_leggauss_0_1(ngrid):
     x, w = np.polynomial.legendre.leggauss(ngrid)
     return 0.5 * (x + 1), 0.5 * w
-
-
-def restricted_biorthogonalize(t_ijab, cc, c_os, c_ss):
-    """
-    Biorthogonalize MP2 amplitude for restricted case.
-
-    .. math::
-        T_{ij}^{ab} = c_\\mathrm{c} \\big( c_\\mathrm{OS} t_{ij}^{ab} + c_\\mathrm{SS} (t_{ij}^{ab} - t_{ij}^{ba})
-        \\big)
-
-    Parameters
-    ----------
-    t_ijab : np.ndarray
-        MP2 amplitude tensor.
-    cc : float
-        Coefficient of MP2 contribution.
-    c_os : float
-        Coefficient of MP2 opposite-spin contribution.
-    c_ss : float
-        Coefficient of MP2 same-spin contribution.
-
-    Returns
-    -------
-    np.ndarray
-
-    Notes
-    -----
-    Object of this function is simple. However, numpy's tensor transpose is notoriously slow.
-    This function serves an API that can perform such kind of work in parallel efficiently.
-    """
-    # TODO: Efficiency may be further improved.
-    coef_0 = cc * (c_os + c_ss)
-    coef_1 = - cc * c_ss
-    # handle different situations
-    if abs(coef_1) < 1e-7:  # SS, do not make transpose
-        return coef_0 * t_ijab
-    else:
-        t_shape = t_ijab.shape
-        t_ijab = t_ijab.reshape((-1, t_ijab.shape[-2], t_ijab.shape[-1]))
-        res = lib.transpose(t_ijab, axes=(0, 2, 1)).reshape(t_shape)
-        t_ijab = t_ijab.reshape(t_shape)
-        res *= coef_1
-        res += coef_0 * t_ijab
-        return res
 
 
 def check_real(var, rtol=1e-5, atol=1e-8):

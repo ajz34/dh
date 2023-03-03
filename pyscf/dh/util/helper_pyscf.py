@@ -2,7 +2,7 @@ import numpy as np
 import re
 from typing import Tuple
 
-from pyscf import gto, data, dft
+from pyscf import gto, data, dft, lib
 import pyscf.data.elements
 
 
@@ -15,26 +15,26 @@ ACCEPTED_DH_CORR = {
 XC_DH_MAP = {   # [xc_for_scf (without advanced corr), xc_for_energy]
     "MP2": "HF + MP2",
     "XYG3": ("B3LYPg", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2"),
-    "XYGJ-OS": ("B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"),
-    "xDH-PBE0": ("PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"),
+    "XYGJ_OS": ("B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"),
+    "xDH_PBE0": ("PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"),
     "B2PLYP": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
     "mPW2PLYP": "0.55*HF + 0.45*mPW91, 0.75*LYP + 0.25*MP2",
-    "PBE0-DH": "0.5*HF + 0.5*PBE, 0.875*PBE + 0.125*MP2",
-    "PBE-QIDH": "0.693361*HF + 0.306639*PBE, 0.666667*PBE + 0.333333*MP2",
-    "PBE0-2": "0.793701*HF + 0.206299*PBE, 0.5*PBE + 0.5*MP2",
+    "PBE0_DH": "0.5*HF + 0.5*PBE, 0.875*PBE + 0.125*MP2",
+    "PBE_QIDH": "0.693361*HF + 0.306639*PBE, 0.666667*PBE + 0.333333*MP2",
+    "PBE0_2": "0.793701*HF + 0.206299*PBE, 0.5*PBE + 0.5*MP2",
     "revXYG3": ("B3LYPg", "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2"),
     "XYG5": ("B3LYPg", "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS"),
     "XYG6": ("B3LYPg", "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS"),
     "XYG7": ("B3LYPg", "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS"),
-    "revXYGJ-OS": ("B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"),
-    "XYGJ-OS5": ("B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"),
+    "revXYGJ_OS": ("B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"),
+    "XYGJ_OS5": ("B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"),
     "B2GPPLYP": "0.65*HF + 0.35*B88, 0.64*LYP + 0.36*MP2",
-    "LS1DH-PBE": "0.75*HF + 0.25*PBE, 0.578125*PBE + 0.421875*MP2",
-    "DSD-PBEP86-D3": "0.69*HF + 0.31*PBE, 0.44*P86 + 0.52*MP2_OS + 0.22*MP2_SS",
-    "DSD-PBEPBE-D3": "0.68*HF + 0.32*PBE, 0.49*PBE + 0.55*MP2_OS + 0.13*MP2_SS",
-    "DSD-BLYP-D3": "0.71*HF + 0.29*B88, 0.54*LYP + 0.47*MP2_OS + 0.40*MP2_SS",
-    "DSD-PBEB95-D3": "0.66*HF + 0.34*PBE, 0.55*B95 + 0.46*MP2_OS + 0.09*MP2_SS",
-    "B2PLYP-D3": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
+    "LS1DH_PBE": "0.75*HF + 0.25*PBE, 0.578125*PBE + 0.421875*MP2",
+    "DSD_PBEP86_D3": "0.69*HF + 0.31*PBE, 0.44*P86 + 0.52*MP2_OS + 0.22*MP2_SS",
+    "DSD_PBEPBE_D3": "0.68*HF + 0.32*PBE, 0.49*PBE + 0.55*MP2_OS + 0.13*MP2_SS",
+    "DSD_BLYP_D3": "0.71*HF + 0.29*B88, 0.54*LYP + 0.47*MP2_OS + 0.40*MP2_SS",
+    "DSD_PBEB95_D3": "0.66*HF + 0.34*PBE, 0.55*B95 + 0.46*MP2_OS + 0.09*MP2_SS",
+    "B2PLYP_D3": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
 }
 
 # upper xc dh common name without -, _, space
@@ -249,23 +249,40 @@ def parse_frozen_list(mol, nmo=None, frz=None, rule=None):
             return act
 
 
-def parse_dh_xc_token(token, is_corr):
-    """ Parse functional token for doubly hybrid functional.
+def standardize_token(token, is_corr=False):
+    """ Standardize xc tokens.
+
+    - hyphen changed to be underline
+    - all characters are capitalized
+    - no spaces unless factor is smaller than zero
+    - parameter list are put into parentheses, separated by semicolon instead of comma
+    - numeric factors lies before xc name
+    - floats round up to 6th decimal
+
+    A standardized token may be like ``0.5*B88``, ``- 0.3*VV10(6.0;0.01)``, ``- MP2(0.33;0.33)``, ``XYGJ_OS``,
+    ``WB97X``.
 
     Parameters
     ----------
     token : str
-        Functional token. Should be something like ``0.5 * B88``.
+        Input xc token.
     is_corr : bool
-        Whether token represents exchange or correlation contribution.
+        Whether token represents correlation contribution.
+        Only useful for DFT correlation, to be used in
+
+    Returns
+    -------
+    dict
+        Detailed decomposition of token.
     """
-    token = token.strip().upper()
+    token = token.strip().replace(" ", "").upper()
     # parse number of token (code directly from pyscf.dft.libxc.parse_xc)
     if token[0] == '-':
         sign = -1
         token = token[1:].strip()
     else:
         sign = 1
+    assert token.count("*") <= 1
     if '*' in token:
         fac, key = token.strip().split('*')
         key = key.strip()
@@ -274,60 +291,78 @@ def parse_dh_xc_token(token, is_corr):
         fac = sign * float(fac)
     else:
         fac, key = sign, token.strip()
-
+    fac = round(fac, 6)
+    # parse parameter list
+    if key.count("(") == 0:
+        parameters = []
+        name = key
+    elif key.count("(") == 1:
+        assert key[-1] == ")"
+        name = key.split("(")[0]
+        parameters = [round(float(f), 6) for f in key.split("(")[1][:-1].split(";")]
+    else:
+        assert False
+    # recompose token string
+    info = {
+        "fac": fac,
+        "name": name,
+        "parameters": parameters}
+    info = recompose_token(info)
+    # check whether token is low_rung DFT xc
     try:
-        token_if_pure = ("- " if sign == -1 else "") + token
         if is_corr:
-            dft.libxc.parse_xc("," + token_if_pure)
+            dft.libxc.parse_xc("," + info["token"])
         else:
-            dft.libxc.parse_xc(token_if_pure)
-        return "hyb", token_if_pure
+            dft.libxc.parse_xc(info["token"])
+        is_low_rung = True
     except KeyError:
-        # other correlation contribution case
-        # VV10 or VV10(b; C)
-        if "VV10" in key.upper():
-            key = key.strip().upper()
-            assert key[:4] == "VV10"
-            if "(" not in key:
-                return "other", ("VV10", (5.9, 0.0093))
-            else:
-                values = key[4:].replace("(", "").replace(")", "").split(";")
-                assert len(values) == 2
-                return "other", ("VV10", fac, (float(values[0]), float(values[1])))
-        # advanced correlation of 5th-rung functionals
-        # recognize "_os", "_ss"
-        key = key.replace("-", "_").strip().upper()
-        if "_" not in key:
-            key_name = key
-            fac_os = fac_ss = fac
+        is_corr = False
+        is_low_rung = False
+    info.update({
+        "low_rung": is_low_rung,
+        "corr": is_corr,
+    })
+    return info
+
+
+def recompose_token(info):
+    """ Re-compose a token by detailed information
+
+    Parameters
+    ----------
+    info : dict
+
+    Returns
+    -------
+    dict
+        Dictionary of detailed information including token string.
+    """
+    info = info.copy()
+    fac, name, parameters = info["fac"], info["name"], info["parameters"]
+    # re-compose to a standardlized token
+    re_token = name
+    if np.allclose(abs(fac), 1):
+        if fac < 0:
+            re_token = "- " + re_token
+    else:
+        if fac < 0:
+            re_token = "- " + str(abs(fac)) + "*" + re_token
         else:
-            key_split = key.split("_")
-            if len(key_split) != 2:
-                raise KeyError("Key {:} has more than 2 underscores and can't be recognized!".format(key))
-            key_name, key_spin = key_split
-            if key_spin == "OS":
-                fac_os, fac_ss = fac, 0
-            elif key_spin == "SS":
-                fac_os, fac_ss = 0, fac
-            else:
-                raise KeyError("Spin indicator {:} of key {:} is not recoginzed! Should be SS or OS."
-                               .format(key_spin, key))
-        if key_name not in ACCEPTED_DH_CORR:
-            raise KeyError("{:} is not recognized as an doubly hybrid ingredient!".format(key_name))
-        return "adv", (key_name, (fac_os, fac_ss))
+            re_token = str(abs(fac)) + "*" + re_token
+    if len(parameters) > 0:
+        re_token = re_token + "(" + ";".join([str(f) for f in parameters]) + ")"
+    info["token"] = re_token
+    return info
 
 
-def parse_dh_xc_code_detailed(xc_code, is_corr=False):
+def parse_dh_xc_code_detailed(xc_code):
     """ Parse detailed functional description for doubly hybrid functional.
 
     Rule of functional description (xc code) is similar to ``pyscf.dft.libxc.parse_xc``.
 
-    In addition, advanced correlation (5th-rung correlation on Jacob's ladder) must be defined
-    in correlation part of xc code, if exchange and correlation part of xc code are separated
-    by comma.
-
     To specify oppo-spin and same-spin contributions, ``_OS`` and ``_SS`` should be added
-    after the advanced correlation tokens.
+    after the advanced correlation tokens; or one can define oppo-spin and same-spin factors
+    as parameters (``MP2(0.55;0.13)`` as an example of DSD-PBEPBE-D3).
 
     For example, energy evaluation functional of XYGJ-OS can be defined as follows:
 
@@ -339,7 +374,8 @@ def parse_dh_xc_code_detailed(xc_code, is_corr=False):
 
     .. code::
 
-        ('0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP', [('MP2', (0.4364, 0))], [])
+        ('0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP',
+         [detailed parsed tokens])
 
     In the result tuple, first part is xc code of hybrid functional (<= 4th-rung), which
     should be able to be parsed by ``pyscf.dft.libxc.parse_xc``.
@@ -350,58 +386,109 @@ def parse_dh_xc_code_detailed(xc_code, is_corr=False):
     ----------
     xc_code : str
         String representation of functional detailed description.
-    is_corr : bool
-        (internal parameter) Changes token parse logic. This parameter is not designed
-        for API users.
 
     Returns
     -------
-    tuple
+    list[dict]
         Parsed xc code of 3 parts: hybrid, advanced correlation, other.
 
     Notes
     -----
     Acceptable advanced correlation tokens are
+    """
+    if "," in xc_code:
+        xc_code_x, xc_code_c = xc_code.split(",")
+    else:
+        xc_code_x, xc_code_c = xc_code, ""
+    token_x = xc_code_x.strip().replace('-', '+-').replace(';+', ';').split('+')
+    token_c = xc_code_c.strip().replace('-', '+-').replace(';+', ';').split('+')
+    token_x = [t for t in token_x if t != ""]
+    token_c = [t for t in token_c if t != ""]
+    token_info = [standardize_token(t, False) for t in token_x] + [standardize_token(t, True) for t in token_c]
+    return token_info
 
+
+def extract_xc_code_low_rung(token_info):
+    """ Obtain low rung part of xc code.
+
+    Parameters
+    ----------
+    token_info : list[dict]
+
+    Returns
+    -------
+    str
+    """
+    token_x_low_rung = [t["token"] for t in token_info if t["low_rung"] and not t["corr"]]
+    token_c_low_rung = [t["token"] for t in token_info if t["low_rung"] and t["corr"]]
+    # generate low rung tokens
+    token_low_rung = " + ".join(token_x_low_rung).strip()
+    if len(token_c_low_rung) > 0:
+        token_low_rung += ", " + " + ".join(token_c_low_rung).strip()
+    token_low_rung = token_low_rung.replace("+ - ", "- ")
+    return token_low_rung
+
+
+def handle_xc_code_pt2(token_info):
+    """ Modify token info for PT2s.
+
+    - Change something like ``MP2_OS`` to ``MP2(1;0)``
+    - Add PT2 coefficients, such as ``0.5*MP2CR_OS + 0.2*MP2CR_SS`` to ``MP2CR(0.5;0.2)``
+
+    Accepted PT2 codes:
     - MP2
     - IEPA
     - sIEPA
     - MP2cr
     - MP2cr2 (for restricted only)
     - DCPT2
+
+    Parameters
+    ----------
+    token_info : list[dict]
+
+    Returns
+    -------
+    list[dict]
     """
-    # handle codes that exchange, correlation separated by comma
-    if "," in xc_code:
-        xc_code_x, xc_code_c = xc_code.split(",")
-        xc_parsed_x = parse_dh_xc_code_detailed(xc_code_x, is_corr=False)
-        xc_parsed_c = parse_dh_xc_code_detailed(xc_code_c, is_corr=True)
-        if len(xc_parsed_x[1]) != 0:
-            raise KeyError("Advanced correlation contribution should be defined in exchange part of xc code!")
-        return xc_parsed_x[0] + ", " + xc_parsed_c[0], xc_parsed_c[1], xc_parsed_x[2] + xc_parsed_c[2]
-    # handle usual case
-    tokens = xc_code.replace('-', '+-').replace(';+', ';').split('+')
-    xc_hyb, xc_adv, xc_other = [], [], []
-    for token in tokens:
-        # note that xc_type can be "hyb", "adv", "other"; not the same to pyscf's convention
-        xc_type, xc_info = parse_dh_xc_token(token, is_corr)
-        if xc_type == "hyb":
-            xc_hyb.append(xc_info)
-        elif xc_type == "adv":
-            xc_adv.append(xc_info)
-        elif xc_type == "other":
-            xc_other.append(xc_info)
+    accepted_pt2 = ["MP2", "IEPA", "SIEPA", "MP2CR", "MP2CR2", "DCPT2"]
+    accepted_pt2_os = [s + "_OS" for s in accepted_pt2]
+    accepted_pt2_ss = [s + "_SS" for s in accepted_pt2]
+    token_info_ret = []
+    token_info_pt2 = {}
+    for info in token_info:
+        if info["name"] in accepted_pt2 + accepted_pt2_os + accepted_pt2_ss:
+            name = info["name"]
+            parameters = info["parameters"]
+            assert len(parameters) in [0, 2]
+            if len(parameters) == 0:
+                parameters = np.asarray([info["fac"], info["fac"]])
+            else:
+                parameters = info["fac"] * np.asarray(parameters)
+            if name in accepted_pt2_os:
+                name = name[:-3]
+                parameters[1] = 0
+            elif name in accepted_pt2_ss:
+                name = name[:-3]
+                parameters[0] = 0
+            if name in token_info_pt2:
+                updated_parameters = np.asarray(token_info_pt2[name]["parameters"])
+                updated_parameters += parameters
+                token_info_pt2[name]["parameters"] = list(np.round(updated_parameters, 6))
+                token_info_pt2[name] = recompose_token(token_info_pt2[name])
+            else:
+                token_info_pt2[name] = {
+                    "fac": 1,
+                    "name": name,
+                    "parameters": parameters,
+                    "low_rung": False,
+                    "corr": False,
+                }
+                token_info_pt2[name] = recompose_token(token_info_pt2[name])
         else:
-            assert False
-    xc_hyb = " + ".join(xc_hyb).strip().upper().replace(" + - ", " - ")
-    # post process advanced correlations
-    dict_xc_adv = dict()
-    for key, val in xc_adv:
-        if key not in dict_xc_adv:
-            dict_xc_adv[key] = val
-        else:
-            dict_xc_adv[key] = tuple(np.array(val) + np.array(dict_xc_adv[key]))
-    xc_adv = list(dict_xc_adv.items())
-    return xc_hyb, xc_adv, xc_other
+            token_info_ret.append(info)
+    token_info_ret += list(token_info_pt2.values())
+    return token_info_ret
 
 
 def parse_dh_xc_code(xc_code, is_scf):
@@ -409,7 +496,7 @@ def parse_dh_xc_code(xc_code, is_scf):
 
     Parameters
     ----------
-    xc_code : str
+    xc_code : str or tuple[str, str]
         String representation of functional description.
         Can be either detailed description or common name.
     is_scf : bool
@@ -417,7 +504,7 @@ def parse_dh_xc_code(xc_code, is_scf):
 
     Returns
     -------
-    tuple
+    list[dict]
         Parsed xc code of 3 parts: hybrid, advanced correlation, other.
 
     See Also
@@ -435,6 +522,50 @@ def parse_dh_xc_code(xc_code, is_scf):
             xc_code = xc_info
     xc_parsed = parse_dh_xc_code_detailed(xc_code)
     if is_scf:
-        return xc_parsed[0], [], []
+        return [info for info in xc_parsed if info["low_rung"]]
     else:
         return xc_parsed
+
+
+def restricted_biorthogonalize(t_ijab, cc, c_os, c_ss):
+    """
+    Biorthogonalize MP2 amplitude for restricted case.
+
+    .. math::
+        T_{ij}^{ab} = c_\\mathrm{c} \\big( c_\\mathrm{OS} t_{ij}^{ab} + c_\\mathrm{SS} (t_{ij}^{ab} - t_{ij}^{ba})
+        \\big)
+
+    Parameters
+    ----------
+    t_ijab : np.ndarray
+        MP2 amplitude tensor.
+    cc : float
+        Coefficient of MP2 contribution.
+    c_os : float
+        Coefficient of MP2 opposite-spin contribution.
+    c_ss : float
+        Coefficient of MP2 same-spin contribution.
+
+    Returns
+    -------
+    np.ndarray
+
+    Notes
+    -----
+    Object of this function is simple. However, numpy's tensor transpose is notoriously slow.
+    This function serves an API that can perform such kind of work in parallel efficiently.
+    """
+    # TODO: Efficiency may be further improved.
+    coef_0 = cc * (c_os + c_ss)
+    coef_1 = - cc * c_ss
+    # handle different situations
+    if abs(coef_1) < 1e-7:  # SS, do not make transpose
+        return coef_0 * t_ijab
+    else:
+        t_shape = t_ijab.shape
+        t_ijab = t_ijab.reshape((-1, t_ijab.shape[-2], t_ijab.shape[-1]))
+        res = lib.transpose(t_ijab, axes=(0, 2, 1)).reshape(t_shape)
+        t_ijab = t_ijab.reshape(t_shape)
+        res *= coef_1
+        res += coef_0 * t_ijab
+        return res
