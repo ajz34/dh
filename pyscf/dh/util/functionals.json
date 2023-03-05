@@ -1,0 +1,190 @@
+{
+    "MP2": {
+        "code": "HF + MP2",
+        "ref": [
+            "10.1103/PhysRev.46.618",
+            "Møller, Chr.; Plesset, M. S. Note on an Approximation Treatment for Many-Electron Systems. Phys. Rev. 1934, 46 (7), 618–622. https://doi.org/10.1103/PhysRev.46.618."
+        ]
+    },
+    "XYG3": {
+        "code": ["B3LYPg", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2"],
+        "ref": [
+            "10.1073/pnas.0901093106",
+            "Zhang, Y.; Xu, X.; Goddard, W. A. Doubly Hybrid Density Functional for Accurate Descriptions of Nonbond Interactions, Thermochemistry, and Thermochemical Kinetics. Proc. Natl. Acad. Sci. USA 2009, 106 (13), 4963–4968. https://doi.org/10.1073/pnas.0901093106."
+        ]
+    },
+    "XYGJ_OS": {
+        "code": ["B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"],
+        "ref": [
+            "10.1073/pnas.1115123108",
+            "Zhang, I. Y.; Xu, X.; Jung, Y.; Goddard, W. A. A Fast Doubly Hybrid Density Functional Method Close to Chemical Accuracy Using a Local Opposite Spin Ansatz. Proc. Natl. Acad. Sci. USA 2011, 108 (50), 19896–19900. https://doi.org/10.1073/pnas.1115123108."
+        ]
+    },
+    "xDH_PBE0": {
+        "code": ["PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"],
+        "ref": [
+            "10.1063/1.3703893",
+            "Zhang, I. Y.; Su, N. Q.; Brémond, É. A. G.; Adamo, C.; Xu, X. Doubly Hybrid Density Functional XDH-PBE0 from a Parameter-Free Global Hybrid Model PBE0. J. Chem. Phys. 2012, 136 (17), 174103. https://doi.org/10.1063/1.3703893."
+        ]
+    },
+    "B2PLYP": {
+        "code": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
+        "ref": [
+            "10.1063/1.2148954",
+            "Grimme, S. Semiempirical Hybrid Density Functional with Perturbative Second-Order Correlation. J. Chem. Phys. 2006, 124 (3), 034108. https://doi.org/10.1063/1.2148954."
+        ]
+    },
+    "mPW2PLYP": {
+        "code": "0.55*HF + 0.45*mPW91, 0.75*LYP + 0.25*MP2",
+        "ref": [
+            "10.1039/b608478h",
+            "Schwabe, T.; Grimme, S. Towards Chemical Accuracy for the Thermodynamics of Large Molecules: New Hybrid Density Functionals Including Non-Local Correlation Effects. Phys. Chem. Chem. Phys. 2006, 8 (38), 4398. https://doi.org/10.1039/b608478h."
+        ]
+    },
+    "PBE0_DH": {
+        "code": "0.5*HF + 0.5*PBE, 0.875*PBE + 0.125*MP2",
+        "ref": [
+            "10.1063/1.3604569",
+            "Brémond, E.; Adamo, C. Seeking for Parameter-Free Double-Hybrid Functionals: The PBE0-DH Model. J. Chem. Phys. 2011, 135 (2), 024106. https://doi.org/10.1063/1.3604569."
+        ]
+    },
+    "PBE_QIDH": {
+        "code": "0.693361*HF + 0.306639*PBE, 0.666667*PBE + 0.333333*MP2",
+        "ref": [
+            "10.1063/1.4890314",
+            "Brémond, É.; Sancho-García, J. C.; Pérez-Jiménez, Á. J.; Adamo, C. Communication: Double-Hybrid Functionals from Adiabatic-Connection: The QIDH Model. J. Chem. Phys. 2014, 141 (3), 031101. https://doi.org/10.1063/1.4890314."
+        ]
+    },
+    "PBE0_2": {
+        "code": "0.793701*HF + 0.206299*PBE, 0.5*PBE + 0.5*MP2",
+        "ref": [
+            "10.1016/j.cplett.2012.04.045",
+            "Chai, J.-D.; Mao, S.-P. Seeking for Reliable Double-Hybrid Density Functionals without Fitting Parameters: The PBE0-2 Functional. Chem. Phys. Lett. 2012, 538, 121–125. https://doi.org/10.1016/j.cplett.2012.04.045."
+        ]
+    },
+    "revXYG3": {
+        "code": ["B3LYPg", "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2"],
+        "ref": [
+            "10.1021/acs.jpclett.1c00360",
+            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+        ],
+        "family": "xDH@B3LYP"
+    },
+    "XYG5": {
+        "code": ["B3LYPg", "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS"],
+        "ref": [
+            "10.1021/acs.jpclett.1c00360",
+            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+        ],
+        "family": "xDH@B3LYP"
+    },
+    "XYG6": {
+        "code": ["B3LYPg", "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS"],
+        "ref": [
+            "10.1021/acs.jpclett.1c00360",
+            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+        ],
+        "family": "xDH@B3LYP"
+    },
+    "XYG7": {
+        "code": ["B3LYPg", "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS"],
+        "ref": [
+            "10.1021/acs.jpclett.1c00360",
+            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+        ],
+        "family": "xDH@B3LYP"
+    },
+    "revXYGJ_OS": {
+        "code": ["B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"],
+        "ref": [
+            "10.1021/acs.jpclett.1c00360",
+            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+        ],
+        "family": "xDH@B3LYP"
+    },
+    "XYGJ_OS5": {
+        "code": ["B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"],
+        "ref": [
+            "10.1021/acs.jpclett.1c00360",
+            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+        ],
+        "family": "xDH@B3LYP"
+    },
+    "B2GPPLYP": {
+        "code": "0.65*HF + 0.35*B88, 0.64*LYP + 0.36*MP2",
+        "ref": [
+            "10.1021/jp801805p",
+            "Karton, A.; Tarnopolsky, A.; Lamère, J.-F.; Schatz, G. C.; Martin, J. M. L. Highly Accurate First-Principles Benchmark Data Sets for the Parametrization and Validation of Density Functional and Other Approximate Methods. Derivation of a Robust, Generally Applicable, Double-Hybrid Functional for Thermochemistry and Thermochemical Kinetics. J. Phys. Chem. A 2008, 112 (50), 12868–12886. https://doi.org/10.1021/jp801805p."
+        ]
+    },
+    "LS1DH_PBE": {
+        "code": "0.75*HF + 0.25*PBE, 0.578125*PBE + 0.421875*MP2",
+        "ref": [
+            "10.1063/1.3640019",
+            "Toulouse, J.; Sharkas, K.; Brémond, E.; Adamo, C. Communication: Rationale for a New Class of Double-Hybrid Approximations in Density-Functional Theory. J. Chem. Phys. 2011, 135 (10), 101102. https://doi.org/10.1063/1.3640019."
+        ]
+    },
+    "DSD_PBEP86_D3": {
+        "code": "0.69*HF + 0.31*PBE, 0.44*P86 + 0.52*MP2_OS + 0.22*MP2_SS",
+        "ref": [
+            "10.1002/jcc.23391",
+            "Kozuch, S.; Martin, J. M. L. Spin-Component-Scaled Double Hybrids: An Extensive Search for the Best Fifth-Rung Functionals Blending DFT and Perturbation Theory. J. Comput. Chem. 2013, 2327–2344. https://doi.org/10.1002/jcc.23391."
+        ],
+        "family": "DSD-D3"
+    },
+    "DSD_PBEPBE_D3": {
+        "code": "0.68*HF + 0.32*PBE, 0.49*PBE + 0.55*MP2_OS + 0.13*MP2_SS",
+        "ref": [
+            "10.1002/jcc.23391",
+            "Kozuch, S.; Martin, J. M. L. Spin-Component-Scaled Double Hybrids: An Extensive Search for the Best Fifth-Rung Functionals Blending DFT and Perturbation Theory. J. Comput. Chem. 2013, 2327–2344. https://doi.org/10.1002/jcc.23391."
+        ],
+        "family": "DSD-D3"
+    },
+    "DSD_BLYP_D3": {
+        "code": "0.71*HF + 0.29*B88, 0.54*LYP + 0.47*MP2_OS + 0.40*MP2_SS",
+        "ref": [
+            "10.1002/jcc.23391",
+            "Kozuch, S.; Martin, J. M. L. Spin-Component-Scaled Double Hybrids: An Extensive Search for the Best Fifth-Rung Functionals Blending DFT and Perturbation Theory. J. Comput. Chem. 2013, 2327–2344. https://doi.org/10.1002/jcc.23391."
+        ],
+        "family": "DSD-D3"
+    },
+    "DSD_PBEB95_D3": {
+        "code": "0.66*HF + 0.34*PBE, 0.55*B95 + 0.46*MP2_OS + 0.09*MP2_SS",
+        "ref": [
+            "10.1002/jcc.23391",
+            "Kozuch, S.; Martin, J. M. L. Spin-Component-Scaled Double Hybrids: An Extensive Search for the Best Fifth-Rung Functionals Blending DFT and Perturbation Theory. J. Comput. Chem. 2013, 2327–2344. https://doi.org/10.1002/jcc.23391."
+        ],
+        "family": "DSD-D3"
+    },
+    "B2PLYP_D3": {
+        "code": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
+        "ref": [
+            "10.1063/1.3382344",
+            "Grimme, S.; Antony, J.; Ehrlich, S.; Krieg, H. A Consistent and Accurate Ab Initio Parametrization of Density Functional Dispersion Correction (DFT-D) for the 94 Elements H-Pu. J. Chem. Phys. 2010, 132 (15), 154104. https://doi.org/10.1063/1.3382344."
+        ]
+    },
+    "ZRPS@PBE": {
+        "code": ["PBE", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA_OS"],
+        "ref": [
+            "10.1103/PhysRevLett.117.133002",
+            "Zhang, I. Y.; Rinke, P.; Perdew, J. P.; Scheffler, M. Towards Efficient Orbital-Dependent Density Functionals for Weak and Strong Correlation. Phys. Rev. Lett. 2016, 117 (13), 133002. https://doi.org/10.1103/PhysRevLett.117.133002."
+        ],
+        "family": "ZRPS"
+    },
+    "ZRPS@PBE0": {
+        "code": ["PBE0", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA_OS"],
+        "ref": [
+            "10.1103/PhysRevLett.117.133002",
+            "Zhang, I. Y.; Rinke, P.; Perdew, J. P.; Scheffler, M. Towards Efficient Orbital-Dependent Density Functionals for Weak and Strong Correlation. Phys. Rev. Lett. 2016, 117 (13), 133002. https://doi.org/10.1103/PhysRevLett.117.133002."
+        ],
+        "family": "ZRPS"
+    },
+    "MP2cr": {
+        "code": "HF + MP2CR",
+        "ref": [
+            "10.1002/(SICI)1097-461X(2000)78:4<226::AID-QUA4>3.0.CO;2-N",
+            "Dykstra, C. E.; Davidson, E. R. Enhanced Second-Order Treatment of Electron Pair Correlation. Int. J. Quantum Chem. 2000, 78 (4), 226–236. https://doi.org/10.1002/(SICI)1097-461X(2000)78:4<226::AID-QUA4>3.0.CO;2-N."
+        ],
+        "alias": ["MP2cr1"]
+    }
+}

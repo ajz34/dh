@@ -1,48 +1,30 @@
 import numpy as np
 import re
+import json
+import os
 from typing import Tuple
 
 from pyscf import gto, data, dft, lib
 import pyscf.data.elements
 
+path_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "functionals.json")
+with open(path_functionals, "r") as f:
+    FUNCTIONALS_DICT = json.load(f)
 
-""" Accepted advanced correlation ingredient list. """
-ACCEPTED_DH_CORR = {
-    "MP2", "IEPA", "SIEPA", "MP2CR", "MP2CR2", "DCPT2"
-}
 
 """ Common name and detailed xc code of doubly hybrids. """
-XC_DH_MAP = {   # [xc_for_scf (without advanced corr), xc_for_energy]
-    "MP2": "HF + MP2",
-    "XYG3": ("B3LYPg", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2"),
-    "XYGJ_OS": ("B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"),
-    "xDH_PBE0": ("PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"),
-    "B2PLYP": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
-    "mPW2PLYP": "0.55*HF + 0.45*mPW91, 0.75*LYP + 0.25*MP2",
-    "PBE0_DH": "0.5*HF + 0.5*PBE, 0.875*PBE + 0.125*MP2",
-    "PBE_QIDH": "0.693361*HF + 0.306639*PBE, 0.666667*PBE + 0.333333*MP2",
-    "PBE0_2": "0.793701*HF + 0.206299*PBE, 0.5*PBE + 0.5*MP2",
-    "revXYG3": ("B3LYPg", "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2"),
-    "XYG5": ("B3LYPg", "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS"),
-    "XYG6": ("B3LYPg", "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS"),
-    "XYG7": ("B3LYPg", "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS"),
-    "revXYGJ_OS": ("B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"),
-    "XYGJ_OS5": ("B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"),
-    "B2GPPLYP": "0.65*HF + 0.35*B88, 0.64*LYP + 0.36*MP2",
-    "LS1DH_PBE": "0.75*HF + 0.25*PBE, 0.578125*PBE + 0.421875*MP2",
-    "DSD_PBEP86_D3": "0.69*HF + 0.31*PBE, 0.44*P86 + 0.52*MP2_OS + 0.22*MP2_SS",
-    "DSD_PBEPBE_D3": "0.68*HF + 0.32*PBE, 0.49*PBE + 0.55*MP2_OS + 0.13*MP2_SS",
-    "DSD_BLYP_D3": "0.71*HF + 0.29*B88, 0.54*LYP + 0.47*MP2_OS + 0.40*MP2_SS",
-    "DSD_PBEB95_D3": "0.66*HF + 0.34*PBE, 0.55*B95 + 0.46*MP2_OS + 0.09*MP2_SS",
-    "B2PLYP_D3": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
-    "ZRPS@PBE": ("PBE", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA_OS"),
-    "ZRPS@PBE0": ("PBE0", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA_OS"),
-}
+XC_DH_MAP = {}
+for xc in FUNCTIONALS_DICT:
+    code = FUNCTIONALS_DICT[xc]["code"]
+    XC_DH_MAP[xc] = code
+    if "alias" in FUNCTIONALS_DICT[xc]:
+        for alias in FUNCTIONALS_DICT[xc]["alias"]:
+            XC_DH_MAP[alias] = code
 
-# upper xc dh common name without -, _, space
+# upper xc dh common name without -, _, /, space
 XC_DH_NORMED_SET = dict()
 for _xc_code in XC_DH_MAP:
-    XC_DH_NORMED_SET[re.sub("[-_ ]", "", _xc_code).upper()] = _xc_code
+    XC_DH_NORMED_SET[re.sub("[-_ /]", "", _xc_code).upper()] = _xc_code
 
 
 def parse_frozen_numbers(mol, rule=None) -> Tuple[int, int]:
@@ -513,12 +495,12 @@ def parse_dh_xc_code(xc_code, is_scf):
     --------
     parse_dh_xc_code_detailed
     """
-    if isinstance(xc_code, tuple):
+    if isinstance(xc_code, (tuple, list)):
         xc_code = xc_code[0] if is_scf else xc_code[1]
     xc_code_normed = re.sub("[-_ ]", "", xc_code).upper()
     if xc_code_normed in XC_DH_NORMED_SET:
         xc_info = XC_DH_MAP[XC_DH_NORMED_SET[xc_code_normed]]
-        if isinstance(xc_info, tuple):
+        if isinstance(xc_info, (tuple, list)):
             xc_code = xc_info[0] if is_scf else xc_info[1]
         else:
             xc_code = xc_info
