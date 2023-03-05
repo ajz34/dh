@@ -316,6 +316,17 @@ class Params:
     Should be serializable. Array size of values stored in dictionary should be generally small.
     """
 
+    def __init__(self, flags=None, tensors=None, results=None):
+        if flags is None:
+            flags = {}
+        if tensors is None:
+            tensors = HybridDict()
+        if results is None:
+            results = {}
+        self.flags = flags
+        self.tensors = tensors
+        self.results = results
+
     def __iter__(self):
         yield from [self.flags, self.tensors, self.results]
 

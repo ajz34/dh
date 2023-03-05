@@ -1,7 +1,7 @@
 from pyscf.dh import util
 from pyscf.dh.energy.riepa import get_pair_mp2, get_pair_iepa, get_pair_siepa, get_pair_dcpt2
 
-from pyscf import lib
+from pyscf import lib, ao2mo
 import numpy as np
 from scipy.special import erfc
 import typing
@@ -27,13 +27,51 @@ def driver_energy_uiepa(mf_dh):
     --------
     pyscf.dh.energy.riepa.driver_energy_riepa
     """
-    c_os = mf_dh.params.flags["coef_os"]
-    c_ss = mf_dh.params.flags["coef_ss"]
+    flags = mf_dh.params.flags
+    log = mf_dh.log
+    c_os = flags["coef_os"]
+    c_ss = flags["coef_ss"]
     mo_energy_act = mf_dh.mo_energy_act
-    # generate ri-eri
-    Y_OV = mf_dh.get_Y_OV()
-    results = kernel_energy_uiepa_ri(
-        mf_dh.params, mo_energy_act, Y_OV,
+    nOcc = mf_dh.nOcc
+    # kernel
+    if flags["integral_scheme"].lower().startswith("ri"):
+        # generate ri-eri
+        Y_OV = mf_dh.get_Y_OV()
+
+        def gen_g_IJab(s0, s1, i, j):
+            return Y_OV[s0][:, i].T @ Y_OV[s1][:, j]
+    elif flags["integral_scheme"].lower().startswith("conv"):
+        log.warn("Conventional integral of MP2 is not recommended!\n"
+                 "Use density fitting approximation is recommended.")
+        eri_or_mol = mf_dh.mf._eri
+        if eri_or_mol is None:
+            eri_or_mol = mf_dh.mol
+        nVir = mf_dh.nVir
+        mo_coeff_act = mf_dh.mo_coeff_act
+        CO = [mo_coeff_act[s][:, :nOcc[s]] for s in (0, 1)]
+        CV = [mo_coeff_act[s][:, nOcc[s]:] for s in (0, 1)]
+        g_iajb = [np.array([])] * 3
+        for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
+            g_iajb[ss] = ao2mo.general(eri_or_mol, (CO[s0], CV[s0], CO[s1], CV[s1])) \
+                              .reshape(nOcc[s0], nVir[s0], nOcc[s1], nVir[s1])
+            log.debug("Spin {:}{:} ao2mo finished".format(s0, s1))
+
+        def gen_g_IJab(s0, s1, i, j):
+            if (s0, s1) == (0, 0):
+                return g_iajb[0][i, :, j]
+            elif (s0, s1) == (1, 1):
+                return g_iajb[2][i, :, j]
+            elif (s0, s1) == (0, 1):
+                return g_iajb[1][i, :, j]
+            elif (s0, s1) == (1, 0):
+                return g_iajb[1][j, :, i].T
+            else:
+                raise ValueError("Not accepted spin!")
+    else:
+        raise NotImplementedError
+
+    results = kernel_energy_uiepa(
+        mf_dh.params, mo_energy_act, gen_g_IJab, nOcc,
         c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
@@ -41,8 +79,8 @@ def driver_energy_uiepa(mf_dh):
     mf_dh.params.update_results(results)
 
 
-def kernel_energy_uiepa_ri(
-        params, mo_energy, Y_OV,
+def kernel_energy_uiepa(
+        params, mo_energy, gen_g_IJab, nocc,
         c_os=1., c_ss=1., screen_func=erfc,
         thresh=1e-10, max_cycle=64,
         verbose=lib.logger.NOTE):
@@ -58,8 +96,12 @@ def kernel_energy_uiepa_ri(
         Tensors will be updated to store pair energies and norms (MP2/cr).
     mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
-    Y_OV : list[np.ndarray]
-        Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
+    gen_g_IJab : callable
+        Generate ERI block :math:`(ij|ab)` where :math:`i, j` is specified.
+        Function signature should be ``gen_g_IJab(s0: int, s1: int, i: int, j: int) -> np.ndarray``
+        with shape of returned array (a, b) and spin of s0 (i, a) and spin of s1 (j, b).
+    nocc : list[int]
+        Number of occupied molecular orbitals.
 
     c_os : float
         MP2 opposite-spin contribution coefficient.
@@ -79,9 +121,6 @@ def kernel_energy_uiepa_ri(
     pyscf.dh.energy.riepa.kernel_energy_riepa_ri
     """
     log = lib.logger.new_logger(verbose=verbose)
-    nocc, nvir = np.array([0, 0]), np.array([0, 0])
-    naux, nocc[0], nvir[0] = Y_OV[0].shape
-    naux, nocc[1], nvir[1] = Y_OV[1].shape
     eo = [mo_energy[s][:nocc[s]] for s in (0, 1)]
     ev = [mo_energy[s][nocc[s]:] for s in (0, 1)]
 
@@ -127,7 +166,7 @@ def kernel_energy_uiepa_ri(
             for J in range(maxJ):
                 log.debug("In IEPA kernel, pair ({:}, {:})".format(I, J))
                 D_IJab = eo[s0][I] + eo[s1][J] + D_ab
-                g_IJab = Y_OV[s0][:, I].T @ Y_OV[s1][:, J]  # PIa, PJb -> IJab
+                g_IJab = gen_g_IJab(s0, s1, I, J)  # Y_OV[s0][:, I].T @ Y_OV[s1][:, J]
                 if is_same_spin:
                     g_IJab = g_IJab - g_IJab.T
                 # evaluate pair energy for different schemes

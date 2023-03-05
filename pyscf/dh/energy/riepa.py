@@ -1,6 +1,6 @@
 from pyscf.dh import util
 
-from pyscf import lib
+from pyscf import lib, ao2mo
 import numpy as np
 from scipy.special import erfc
 import typing
@@ -37,15 +37,39 @@ def driver_energy_riepa(mf_dh):
 
     Calculation of this driver forces using density fitting MP2.
     """
-    c_os = mf_dh.params.flags["coef_os"]
-    c_ss = mf_dh.params.flags["coef_ss"]
+    flags = mf_dh.params.flags
+    log = mf_dh.log
+    c_os = flags["coef_os"]
+    c_ss = flags["coef_ss"]
     # parse frozen orbitals
     mo_energy_act = mf_dh.mo_energy_act
-    # generate ri-eri
-    Y_OV = mf_dh.get_Y_OV()
+    nOcc = mf_dh.nOcc
     # kernel
-    results = kernel_energy_riepa_ri(
-        mf_dh.params, mo_energy_act, Y_OV,
+    if flags["integral_scheme"].lower().startswith("ri"):
+        # generate ri-eri
+        Y_OV = mf_dh.get_Y_OV()
+
+        def gen_g_IJab(i, j):
+            return Y_OV[:, i].T @ Y_OV[:, j]
+    elif flags["integral_scheme"].lower().startswith("conv"):
+        log.warn("Conventional integral of MP2 is not recommended!\n"
+                 "Use density fitting approximation is recommended.")
+        eri_or_mol = mf_dh.mf._eri
+        if eri_or_mol is None:
+            eri_or_mol = mf_dh.mol
+        nVir = mf_dh.nVir
+        mo_coeff_act = mf_dh.mo_coeff_act
+        CO = mo_coeff_act[:, :nOcc]
+        CV = mo_coeff_act[:, nOcc:]
+        g_iajb = ao2mo.general(eri_or_mol, (CO, CV, CO, CV)).reshape(nOcc, nVir, nOcc, nVir)
+
+        def gen_g_IJab(i, j):
+            return g_iajb[i, :, j]
+    else:
+        raise NotImplementedError
+
+    results = kernel_energy_riepa(
+        mf_dh.params, mo_energy_act, gen_g_IJab, nOcc,
         c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
@@ -53,8 +77,8 @@ def driver_energy_riepa(mf_dh):
     mf_dh.params.update_results(results)
 
 
-def kernel_energy_riepa_ri(
-        params, mo_energy, Y_OV,
+def kernel_energy_riepa(
+        params, mo_energy, gen_g_IJab, nocc,
         c_os=1., c_ss=1., screen_func=erfc,
         thresh=1e-10, max_cycle=64,
         verbose=lib.logger.NOTE):
@@ -70,8 +94,12 @@ def kernel_energy_riepa_ri(
         Tensors will be updated to store pair energies and norms (MP2/cr).
     mo_energy : np.ndarray
         Molecular orbital energy levels.
-    Y_OV : np.ndarray
-        Cholesky decomposed 3c2e ERI in MO basis (occ-vir part).
+    gen_g_IJab : callable
+        Generate ERI block :math:`(ij|ab)` where :math:`i, j` is specified.
+        Function signature should be ``gen_g_IJab(i: int, j: int) -> np.ndarray``
+        with shape of returned array (a, b).
+    nocc : int
+        Number of occupied molecular orbitals.
 
     c_os : float
         MP2 opposite-spin contribution coefficient.
@@ -95,7 +123,6 @@ def kernel_energy_riepa_ri(
     - ``norm_METHOD``: normalization factors of ``MP2CR`` or ``MP2CR2``.
     """
     log = lib.logger.new_logger(verbose=verbose)
-    naux, nocc, nvir = Y_OV.shape
     eo = mo_energy[:nocc]
     ev = mo_energy[nocc:]
 
@@ -136,7 +163,7 @@ def kernel_energy_riepa_ri(
         for J in range(I + 1):
             log.debug("In IEPA kernel, pair ({:}, {:})".format(I, J))
             D_IJab = eo[I] + eo[J] + D_ab
-            g_IJab = Y_OV[:, I].T @ Y_OV[:, J]  # PIa, PJb -> IJab
+            g_IJab = gen_g_IJab(I, J)  # Y_OV[:, I].T @ Y_OV[:, J]
             g_IJab_asym = g_IJab - g_IJab.T
             # evaluate pair energy for different schemes
             for scheme in schemes_for_pair:

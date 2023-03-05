@@ -52,7 +52,7 @@ def driver_energy_rmp2(mf_dh):
     mo_energy_act = mf_dh.mo_energy_act
     frac_num_f = frac_num[mask_act] if frac_num else None
     # MP2 kernels
-    if mf_dh.params.flags["integral_scheme"].lower() == "conv":
+    if mf_dh.params.flags["integral_scheme"].lower().startswith("conv"):
         eri_or_mol = mf_dh.mf._eri
         if eri_or_mol is None:
             eri_or_mol = mol
@@ -64,7 +64,7 @@ def driver_energy_rmp2(mf_dh):
             max_memory=mol.max_memory - lib.current_memory()[0],
             verbose=mf_dh.verbose)
         mf_dh.params.update_results(results)
-    elif mf_dh.params.flags["integral_scheme"].lower() in ["ri", "rimp2"]:
+    elif mf_dh.params.flags["integral_scheme"].lower().startswith("ri"):
         Y_OV = mf_dh.get_Y_OV()
         Y_OV_2 = None
         if mf_dh.df_ri_2 is not None:

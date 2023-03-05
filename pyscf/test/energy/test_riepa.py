@@ -98,10 +98,22 @@ class TestRIEPA(unittest.TestCase):
         mf_s.conv_tol_grad = 1e-10
         mf_s.run()
         mf = dh.energy.RDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
-        with mf.params.temporary_flags({"iepa_scheme": ["mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"]}):
-            mf.driver_energy_iepa()
+        mf.params.flags.update({
+            "iepa_scheme": ["mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"],
+            "integral_scheme": "ri",
+        })
+        mf.driver_energy_iepa()
         self.assertTrue(np.allclose(mf.params.results["eng_MP2CR"], -0.3362883633558271))
         self.assertTrue(np.allclose(mf.params.results["eng_MP2CR2"], -0.3250218179820349))
         self.assertTrue(np.allclose(mf.params.results["eng_SIEPA"], -0.3503855844336058))
         # self.assertTrue(np.allclose(mf.params.results["eng_dcpt2"], -0.34933565145777545))
+
+        mf = dh.energy.RDH(mf_s, xc="MP2")
+        mf.params.flags.update({
+            "iepa_scheme": ["mp2cr", "mp2cr2", "dcpt2", "iepa", "siepa"],
+            "integral_scheme": "conv",
+        })
+        mf.driver_energy_iepa()
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2CR"], -0.3362937710915961))
+        self.assertTrue(np.allclose(mf.params.results["eng_MP2CR2"], -0.3250272544161117))
+        self.assertTrue(np.allclose(mf.params.results["eng_SIEPA"], -0.3503916656239522))
