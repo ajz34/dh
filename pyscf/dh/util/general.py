@@ -309,6 +309,11 @@ class DictWithDefault(dict):
             return self._default_dict[item]
         return super().__getitem__(item)
 
+    def copy(self) -> "DictWithDefault":
+        copied = DictWithDefault(super().copy())
+        copied.set_default_dict(self._default_dict)
+        return copied
+
 
 @dataclass
 class Params:
@@ -367,7 +372,7 @@ class Params:
             Default flags to be filled.
         """
         old_flags = self.flags.copy()
-        self.flags = default_flag
+        self.flags = DictWithDefault(default_flag)
         self.flags.update(old_flags)
         yield self
         self.flags = old_flags
