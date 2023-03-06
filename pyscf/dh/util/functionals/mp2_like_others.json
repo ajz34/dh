@@ -1,32 +1,4 @@
 {
-    "MP2": {
-        "code": "HF + MP2",
-        "ref": [
-            "10.1103/PhysRev.46.618",
-            "Møller, Chr.; Plesset, M. S. Note on an Approximation Treatment for Many-Electron Systems. Phys. Rev. 1934, 46 (7), 618–622. https://doi.org/10.1103/PhysRev.46.618."
-        ]
-    },
-    "XYG3": {
-        "code": ["B3LYPg", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2"],
-        "ref": [
-            "10.1073/pnas.0901093106",
-            "Zhang, Y.; Xu, X.; Goddard, W. A. Doubly Hybrid Density Functional for Accurate Descriptions of Nonbond Interactions, Thermochemistry, and Thermochemical Kinetics. Proc. Natl. Acad. Sci. USA 2009, 106 (13), 4963–4968. https://doi.org/10.1073/pnas.0901093106."
-        ]
-    },
-    "XYGJ_OS": {
-        "code": ["B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"],
-        "ref": [
-            "10.1073/pnas.1115123108",
-            "Zhang, I. Y.; Xu, X.; Jung, Y.; Goddard, W. A. A Fast Doubly Hybrid Density Functional Method Close to Chemical Accuracy Using a Local Opposite Spin Ansatz. Proc. Natl. Acad. Sci. USA 2011, 108 (50), 19896–19900. https://doi.org/10.1073/pnas.1115123108."
-        ]
-    },
-    "xDH_PBE0": {
-        "code": ["PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"],
-        "ref": [
-            "10.1063/1.3703893",
-            "Zhang, I. Y.; Su, N. Q.; Brémond, É. A. G.; Adamo, C.; Xu, X. Doubly Hybrid Density Functional XDH-PBE0 from a Parameter-Free Global Hybrid Model PBE0. J. Chem. Phys. 2012, 136 (17), 174103. https://doi.org/10.1063/1.3703893."
-        ]
-    },
     "B2PLYP": {
         "code": "0.53*HF + 0.47*B88, 0.73*LYP + 0.27*MP2",
         "ref": [
@@ -62,53 +34,13 @@
             "Chai, J.-D.; Mao, S.-P. Seeking for Reliable Double-Hybrid Density Functionals without Fitting Parameters: The PBE0-2 Functional. Chem. Phys. Lett. 2012, 538, 121–125. https://doi.org/10.1016/j.cplett.2012.04.045."
         ]
     },
-    "revXYG3": {
-        "code": ["B3LYPg", "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2"],
+    "SCAN0_2": {
+        "code": "0.793701*HF + 0.206299*SCAN, 0.5*SCAN + 0.5*MP2",
         "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
+            "10.1063/1.4940734",
+            "Hui, K.; Chai, J.-D. SCAN-Based Hybrid and Double-Hybrid Density Functionals from Models without Fitted Parameters. J. Chem. Phys. 2016, 144 (4), 044114. https://doi.org/10.1063/1.4940734."
         ],
-        "family": "xDH@B3LYP"
-    },
-    "XYG5": {
-        "code": ["B3LYPg", "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
-        "family": "xDH@B3LYP"
-    },
-    "XYG6": {
-        "code": ["B3LYPg", "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
-        "family": "xDH@B3LYP"
-    },
-    "XYG7": {
-        "code": ["B3LYPg", "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
-        "family": "xDH@B3LYP"
-    },
-    "revXYGJ_OS": {
-        "code": ["B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
-        "family": "xDH@B3LYP"
-    },
-    "XYGJ_OS5": {
-        "code": ["B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
-        "family": "xDH@B3LYP"
+        "todo": "Result of functional SCAN seems to be unstable for different programs."
     },
     "B2GPPLYP": {
         "code": "0.65*HF + 0.35*B88, 0.64*LYP + 0.36*MP2",
@@ -178,13 +110,5 @@
             "Zhang, I. Y.; Rinke, P.; Perdew, J. P.; Scheffler, M. Towards Efficient Orbital-Dependent Density Functionals for Weak and Strong Correlation. Phys. Rev. Lett. 2016, 117 (13), 133002. https://doi.org/10.1103/PhysRevLett.117.133002."
         ],
         "family": "ZRPS"
-    },
-    "MP2cr": {
-        "code": "HF + MP2CR",
-        "ref": [
-            "10.1002/(SICI)1097-461X(2000)78:4<226::AID-QUA4>3.0.CO;2-N",
-            "Dykstra, C. E.; Davidson, E. R. Enhanced Second-Order Treatment of Electron Pair Correlation. Int. J. Quantum Chem. 2000, 78 (4), 226–236. https://doi.org/10.1002/(SICI)1097-461X(2000)78:4<226::AID-QUA4>3.0.CO;2-N."
-        ],
-        "alias": ["MP2cr1"]
     }
 }

@@ -85,4 +85,22 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         mf.run()
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
+    def test_SCAN0_2(self):
+        # MINP_H2O_cc-pVTZ_SCAN0-2_Libxc
+        # TODO: SCAN seems to be very instable for different softwares.
+        REF_ESCF = -76.204558509844
+        REF_ETOT = -76.348414592594
 
+        params = dh.util.Params(flags={
+            "integral_scheme_scf": "RI-JK",
+            "frozen_rule": "FreezeNobleGasCore"
+        })
+        mf = dh.RDH(mol, xc="SCAN", params=params)
+        mf.mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-jkfit")
+        mf.df_ri = df.DF(mol, auxbasis="cc-pVTZ-ri")
+        mf.run()
+        print()
+        print(mf.mf.e_tot)
+        print(mf.e_tot)
+        self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
+        self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)

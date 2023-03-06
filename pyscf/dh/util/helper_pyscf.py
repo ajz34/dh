@@ -7,9 +7,11 @@ from typing import Tuple
 from pyscf import gto, data, dft, lib
 import pyscf.data.elements
 
-path_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "functionals.json")
-with open(path_functionals, "r") as f:
-    FUNCTIONALS_DICT = json.load(f)
+dir_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "functionals")
+FUNCTIONALS_DICT = dict()
+for file_name in os.listdir(dir_functionals):
+    with open(os.path.join(dir_functionals, file_name), "r") as f:
+        FUNCTIONALS_DICT.update(json.load(f))
 
 
 """ Common name and detailed xc code of doubly hybrids. """
