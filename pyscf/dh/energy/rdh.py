@@ -32,19 +32,31 @@ class RDH(lib.StreamObject):
         if params:
             self.params = params
         else:
-            self.params = Params(util.get_default_options(), HybridDict(), {})
+            self.params = Params({}, HybridDict(), {})
+        self.params.flags.set_default_dict(util.get_default_options())
         # generate mf object
+        log = lib.logger.new_logger(verbose=mf_or_mol.verbose)
         xc_code_scf = util.extract_xc_code_low_rung(util.parse_dh_xc_code(xc, is_scf=True))
         if isinstance(mf_or_mol, gto.Mole):
+            log.note("Molecule object passed-in. Generate an SCF object and evaluate SCF first.\n")
             mol = mf_or_mol
             if self.restricted:
-                mf = dft.RKS(mol, xc=xc_code_scf).density_fit(df.aug_etb(mol))
+                mf = dft.RKS(mol, xc=xc_code_scf)
             else:
-                mf = dft.UKS(mol, xc=xc_code_scf).density_fit(df.aug_etb(mol))
+                mf = dft.UKS(mol, xc=xc_code_scf)
+            # handle ri in scf
+            integral_scheme_scf = self.params.flags["integral_scheme_scf"].replace("-", "").lower()
+            is_ri_scf = integral_scheme_scf.startswith("ri")
+            is_ri_jonx = integral_scheme_scf in ["rij", "rijonx"]
+            if is_ri_scf:
+                log.note(
+                    "SCF object uses RI.\n"
+                    "Density fitting basis set is set to aug-etb.\n"
+                    "To custom RI basis in SCF, please modify `mf.mf.with_df` then run SCF object.")
+                mf = mf.density_fit(df.aug_etb(mol), only_dfj=is_ri_jonx)
         else:
             mf = mf_or_mol
         self.mf = mf
-        log = lib.logger.new_logger(verbose=self.mol.verbose)
         # transform mf if pyscf.scf instead of pyscf.dft
         if self.mf.e_tot != 0 and not self.mf.converged:
             log.warn("SCF not converged!")
@@ -67,11 +79,18 @@ class RDH(lib.StreamObject):
         # parse density fitting object
         self.df_ri = df_ri
         if self.df_ri is None and hasattr(mf, "with_df"):
+            log.note(
+                "RI object for doubly hybrid takes as the same from SCF.\n"
+                "We do not generate new RI object by default.")
             self.df_ri = mf.with_df
         if self.df_ri is None:
-            log.warn("Density-fitting object not found. "
-                     "Generate a pyscf.df.DF object by default aug-etb settings.")
+            log.note(
+                "RI object for doubly hybrid not found.\n"
+                "Generate a pyscf.df.DF object by default aug-etb settings.\n")
             self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
+        log.note(
+            "To customize RI object for doubly hybrid instance,\n"
+            "please modify `mf.df_ri` to be pyscf.df.DF instance.")
         # parse other objects
 
         self.df_ri_2 = None
