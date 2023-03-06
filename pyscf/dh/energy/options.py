@@ -1,13 +1,3 @@
-# region General Options
-
-print_level_energy = 0
-""" Print level for pyscf.dh.energy.
-
-Value of this option is related to PySCF's print level.
-"""
-
-# endregion
-
 # region Molecular specific
 
 frozen_rule = None
@@ -87,17 +77,32 @@ False
     If tensor size exceeds this size (in MBytes), then store in disk.
 """
 
-integral_scheme = "ri"
-""" Flag for MP2 integral.
+integral_scheme = "RI"
+""" Flag for PT2 integral.
 
 Parameters
 ----------
-"ri"
+"RI"
     Resolution of identity.
-"conv"
+"Conv"
     Conventional. Not recommended for large system.
-"lt"
-    Laplace transform with resolution of identity. Opposite-spin only.
+"""
+
+integral_scheme_scf = "RI"
+""" Flag for SCF integral.
+
+This extension does not focus on SCF, but will generate an SCF object if only molecule object passed in.
+This flag only handles the case when molecule object passed.
+If SCF object passed to evaluate doubly hybrids, then use everything provided from SCF object unless special cases.
+
+Parameters
+----------
+"RI", "RI-JK"
+    Resolution of identity for both coulomb and exchange (RI-JK).
+"RI-J", "RIJONX"
+    Resolution of identity for coulomb only (RI-JONX).
+"Conv"
+    Conventional.
 """
 
 iepa_scheme = "MP2"

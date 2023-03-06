@@ -291,6 +291,25 @@ class HybridDict(dict):
         return tensors
 
 
+class DictWithDefault(dict):
+    """ Dictionary with default values.
+
+    A dictionary that stores user options and default values.
+    When get a key, first find in user options, then default values.
+    """
+    _default_dict: dict
+    """ Default dictionary. """
+    def set_default_dict(self, default_dict: dict):
+        self._default_dict = default_dict
+
+    def __getitem__(self, item):
+        if item in self:
+            return super().__getitem__(item)
+        if item in self._default_dict:
+            return self._default_dict[item]
+        return super().__getitem__(item)
+
+
 @dataclass
 class Params:
     """ Parameters and data.
@@ -298,7 +317,7 @@ class Params:
     This class hope programmers adopting variable protection.
     See documentation for developer.
     """
-    flags: dict
+    flags: DictWithDefault
     """ Flags stored by dictionary.
     
     Suggests to be composed by simple types such as
@@ -318,7 +337,11 @@ class Params:
 
     def __init__(self, flags=None, tensors=None, results=None):
         if flags is None:
-            flags = {}
+            flags = DictWithDefault()
+        elif isinstance(flags, DictWithDefault):
+            flags = flags
+        else:
+            flags = DictWithDefault(flags)
         if tensors is None:
             tensors = HybridDict()
         if results is None:

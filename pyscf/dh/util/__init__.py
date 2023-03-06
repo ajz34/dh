@@ -18,7 +18,7 @@ File structure
   - ``dferi.py``: Helper additional functions for density fitting
 """
 
-from .general import HybridDict, Params
+from .general import HybridDict, Params, DictWithDefault
 from .helper import (
     calc_batch_size, gen_batch, gen_leggauss_0_1, gen_leggauss_0_inf, sanity_dimension, check_real, parse_incore_flag)
 from .dferi import get_cderi_mo
