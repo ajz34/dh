@@ -155,7 +155,7 @@ class XCList:
         token = token.upper().replace(" ", "")
         for key, val in _NAME_WITH_DASH.items():
             token = token.replace(key, val)
-        match = re.findall(r"((,?)([+-]*)([0-9.]+\*)?(\w+)(\([0-9.,;]+\))?)", token)
+        match = re.findall(r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;]+\))?)", token)
         # sanity check: matched patterns should be exactly equilvant to original token
         if token != "".join([group[0] for group in match]):
             raise ValueError(
