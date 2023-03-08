@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 import enum
 from enum import Flag
+import numpy as np
 from pyscf import dft
 
 
@@ -80,17 +81,22 @@ class XCInfo:
         self.name = name
         self.parameters = parameters
         self.type = typ
-        self._round()
+        self.round()
 
-    def _round(self, ndigits=10):
+    def round(self, ndigits=10):
         """ Round floats for XC factor and parameters. """
-        self.fac = round(self.fac, ndigits)
-        self.parameters = [round(f, ndigits) for f in self.parameters]
+        def adv_round(f, n):
+            if f == round(f):
+                return round(f)
+            return round(f, n)
+
+        self.fac = adv_round(self.fac, ndigits)
+        self.parameters = [adv_round(f, ndigits) for f in self.parameters]
 
     @property
     def token(self) -> str:
         """ Standardlized name of XC contribution. """
-        self._round()
+        self.round()
         token = ""
         if self.fac < 0:
             token += "- "
@@ -115,9 +121,17 @@ class XCList:
     def __init__(self):
         self.xc_list = []
 
-    def build_from_token(self, token: str, code_scf: bool):
+    def build_from_token(
+            self, token: str, code_scf: bool,
+            do_expand_by_spin=True,
+            do_trim=True
+    ):
         self.xc_list = self.parse_token(token, code_scf)
         self.code_scf = code_scf
+        if do_expand_by_spin:
+            self.expand_by_spin()
+        if do_trim:
+            self.trim()
         return self
 
     @classmethod
@@ -259,7 +273,7 @@ class XCList:
             # as well as must be correlation contribution
             if not (guess_type & XCType.CORR):
                 raise KeyError(
-                    "Advanced component {:} should be in correlation contribution.\n"
+                    "Advanced component {:} is not low-rung exchange contribution.\n"
                     "Please consider add a comma to separate exch and corr.".format(name))
             if name in MP2_COMPONENTS:
                 xc_type |= XCType.MP2 | XCType.CORR
@@ -272,6 +286,69 @@ class XCList:
             else:
                 raise KeyError("Unknown advanced C component {:}.".format(name))
         return xc_type
+
+    def trim(self):
+        """ Merge same items and remove terms that contribution coefficient (factor) is zero. """
+        xc_list_trimed = []  # type: list[XCInfo]
+        for info in self.xc_list:
+            skip_info = False
+            # see if mergable
+            for info2 in xc_list_trimed:
+                if info.name == info2.name and info.type == info2.type:
+                    # addable parameters: add parameters
+                    if info.name in _NAME_PARA_ADDABLE:
+                        para = info.fac * np.array(info.parameters)
+                        para2 = info2.fac * np.array(info2.parameters)
+                        info2.fac = 1
+                        info2.parameters = list(para + para2)
+                        skip_info = True
+                        break
+                    # non-addable parameters: add factor
+                    elif info.parameters == info2.parameters:
+                        info2.fac += info.fac
+                        skip_info = True
+                        break
+            if not skip_info:
+                xc_list_trimed.append(info)
+        # check values finally
+        remove_index = []
+        for n, info in enumerate(xc_list_trimed):
+            info.round()
+            if info.fac == 0:
+                remove_index.append(n)
+            if info.name in _NAME_PARA_ADDABLE and abs(np.array(info.parameters)).sum() == 0:
+                remove_index.append(n)
+        for n in remove_index[::-1]:
+            xc_list_trimed.pop(n)
+        self.xc_list = xc_list_trimed
+        return self
+
+    def expand_by_spin(self):
+        """ Expand various PT2 methods by same-spin and oppo-spin coefficients.
+
+        This only applies to several advanced correlations.
+        """
+        names_concern = _NAME_WITH_OS_SS
+        names_concern_os = [s + "_OS" for s in names_concern]
+        names_concern_ss = [s + "_SS" for s in names_concern]
+        for info in self.xc_list:
+            if info.name in names_concern:
+                if len(info.parameters) == 0:
+                    info.parameters = [info.fac, info.fac]
+                    info.fac = 1
+            elif info.name in names_concern_os:
+                if len(info.parameters) != 0:
+                    raise ValueError("{:} should not have parameters.".format(info.name))
+                info.parameters = [info.fac, 0]
+                info.name = info.name[:-3]
+                info.fac = 1
+            elif info.name in names_concern_ss:
+                if len(info.parameters) != 0:
+                    raise ValueError("{:} should not have parameters.".format(info.name))
+                info.parameters = [0, info.fac]
+                info.name = info.name[:-3]
+                info.fac = 1
+        return self
 
     @property
     def token(self) -> str:
@@ -310,7 +387,10 @@ class XCList:
         # 6. sanity check
         rebuild = XCList().build_from_token(token, self.code_scf)
         if rebuild != self:
-            warnings.warn("Returned token is not the same to the original xc list. Double check may required.")
+            warnings.warn(
+                "Returned token is not the same to the original xc list. Double check may required.\n"
+                "Original: {:}\n".format(token) +
+                "Rebuild : {:}".format(rebuild.token))
         return token
 
     def __mul__(self, other: float):
@@ -331,6 +411,8 @@ class XCList:
         return "".join(tokens_self) == "".join(tokens_other)
 
 
+# region modify when additional contribution added
+
 # Advanced correlation contributors
 MP2_COMPONENTS = [
     "MP2", "MP2_OS", "MP2_SS",
@@ -350,6 +432,20 @@ RPA_COMPONENTS = [
 VDW_COMPONENTS = [
     "VV10",
 ]
+
+# xc names that have addable parameters
+_NAME_PARA_ADDABLE = [
+    "MP2", "MP2CR", "MP2CR2", "IEPA", "SIEPA",
+]
+
+# xc names that have suffix _OS and _SS
+_NAME_WITH_OS_SS = [
+    "MP2", "MP2CR", "MP2CR2", "IEPA", "SIEPA",
+]
+
+# endregion
+
+# region parse automatically
 
 # All 5-th functional detailed dictionary
 FUNCTIONALS_DICT = dict()  # type: dict[str, dict]
@@ -382,6 +478,8 @@ _NAME_WITH_DASH.update({
     for key in MP2_COMPONENTS + IEPA_COMPONENTS + RPA_COMPONENTS + VDW_COMPONENTS
     if "_" in key})
 _NAME_WITH_DASH.update(dft.libxc._NAME_WITH_DASH)
+
+# endregion
 
 
 if __name__ == '__main__':
