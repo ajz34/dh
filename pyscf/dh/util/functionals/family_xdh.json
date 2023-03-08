@@ -1,71 +1,53 @@
 {
     "XYG3": {
-        "code": ["B3LYPg", "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2"],
-        "ref": [
-            "10.1073/pnas.0901093106",
-            "Zhang, Y.; Xu, X.; Goddard, W. A. Doubly Hybrid Density Functional for Accurate Descriptions of Nonbond Interactions, Thermochemistry, and Thermochemical Kinetics. Proc. Natl. Acad. Sci. USA 2009, 106 (13), 4963–4968. https://doi.org/10.1073/pnas.0901093106."
-        ]
+        "code_scf": "B3LYPg",
+        "code": "0.8033*HF - 0.0140*LDA + 0.2107*B88, 0.6789*LYP + 0.3211*MP2",
+        "ref": "10.1073/pnas.0901093106"
     },
     "XYGJ_OS": {
-        "code": ["B3LYPg", "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS"],
-        "ref": [
-            "10.1073/pnas.1115123108",
-            "Zhang, I. Y.; Xu, X.; Jung, Y.; Goddard, W. A. A Fast Doubly Hybrid Density Functional Method Close to Chemical Accuracy Using a Local Opposite Spin Ansatz. Proc. Natl. Acad. Sci. USA 2011, 108 (50), 19896–19900. https://doi.org/10.1073/pnas.1115123108."
-        ]
+        "code_scf": "B3LYPg",
+        "code": "0.7731*HF + 0.2269*LDA, 0.2309*VWN3 + 0.2754*LYP + 0.4364*MP2_OS",
+        "ref": "10.1073/pnas.1115123108"
     },
     "xDH_PBE0": {
-        "code": ["PBE0", "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS"],
-        "ref": [
-            "10.1063/1.3703893",
-            "Zhang, I. Y.; Su, N. Q.; Brémond, É. A. G.; Adamo, C.; Xu, X. Doubly Hybrid Density Functional XDH-PBE0 from a Parameter-Free Global Hybrid Model PBE0. J. Chem. Phys. 2012, 136 (17), 174103. https://doi.org/10.1063/1.3703893."
-        ]
+        "code_scf": "PBE0",
+        "code": "0.8335*HF + 0.1665*PBE, 0.5292*PBE + 0.5428*MP2_OS",
+        "ref": "10.1063/1.3703893"
     },
     "revXYG3": {
-        "code": ["B3LYPg", "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
+        "code_scf": "B3LYPg",
+        "code": "0.9196*HF - 0.0222*LDA + 0.1026*B88, 0.6059*LYP + 0.3941*MP2",
+        "ref": "10.1021/acs.jpclett.1c00360",
         "family": "xDH@B3LYP"
     },
     "XYG5": {
-        "code": ["B3LYPg", "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
+        "code_scf": "B3LYPg",
+        "code": "0.9150*HF + 0.0612*LDA + 0.0238*B88, 0.4957*LYP + 0.4548*MP2_OS + 0.2764*MP2_SS",
+        "ref": "10.1021/acs.jpclett.1c00360",
         "family": "xDH@B3LYP"
     },
     "XYG6": {
-        "code": ["B3LYPg", "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
+        "code_scf": "B3LYPg",
+        "code": "0.9105*HF + 0.1576*LDA - 0.0681*B88, 0.1800*VWN3 + 0.2244*LYP + 0.4695*MP2_OS + 0.2426*MP2_SS",
+        "ref": "10.1021/acs.jpclett.1c00360",
         "family": "xDH@B3LYP"
     },
     "XYG7": {
-        "code": ["B3LYPg", "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
+        "code_scf": "B3LYPg",
+        "code": "0.8971*HF + 0.2055*LDA - 0.1408*B88, 0.4056*VWN3 + 0.1159*LYP + 0.4502*MP2_OS + 0.2589*MP2_SS",
+        "ref": "10.1021/acs.jpclett.1c00360",
         "family": "xDH@B3LYP"
     },
     "revXYGJ_OS": {
-        "code": ["B3LYPg", "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
+        "code_scf": "B3LYPg",
+        "code": "0.8877*HF + 0.1123*LDA, -0.0697*VWN3 + 0.6167*LYP + 0.5485*MP2_OS",
+        "ref": "10.1021/acs.jpclett.1c00360",
         "family": "xDH@B3LYP"
     },
     "XYGJ_OS5": {
-        "code": ["B3LYPg", "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS"],
-        "ref": [
-            "10.1021/acs.jpclett.1c00360",
-            "Zhang, I. Y.; Xu, X. Exploring the Limits of the XYG3-Type Doubly Hybrid Approximations for the Main-Group Chemistry: The XDH@B3LYP Model. J. Phys. Chem. Lett. 2021, 12 (10), 2638–2644. https://doi.org/10.1021/acs.jpclett.1c00360."
-        ],
+        "code_scf": "B3LYPg",
+        "code": "0.8928*HF + 0.3393*LDA - 0.2321*B88, 0.3268*VWN3 - 0.0635*LYP + 0.5574*MP2_OS",
+        "ref": "10.1021/acs.jpclett.1c00360",
         "family": "xDH@B3LYP"
     }
 }
