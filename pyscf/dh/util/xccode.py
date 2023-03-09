@@ -14,6 +14,9 @@ from enum import Flag
 import numpy as np
 from pyscf import dft
 
+# For regex of xc token, one may try: https://regex101.com/r/YeQU5m/1
+REGEX_XC = r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;]+\))?)"
+
 
 class XCType(Flag):
     """
@@ -108,6 +111,118 @@ class XCInfo:
         token = token.upper()
         return token
 
+    @classmethod
+    def parse_xc_info(cls, re_group: str or Tuple[str, ...], guess_type: XCType = XCType.UNKNOWN) -> "XCInfo":
+        """ Parse xc info from regex groups.
+
+        See Also
+        --------
+        parse_token
+        """
+        if isinstance(re_group, str):
+            re_group = re_group.strip().replace(" ", "").upper()
+            match = re.findall(REGEX_XC, re_group)
+            if len(match) != 1:
+                raise ValueError("Read from info failed in that prehaps multiple info is required.")
+            if re_group != match[0][0]:
+                raise ValueError(
+                    "XC token {:} is not successfully parsed.\n"
+                    "Regex match of this token becomes {:}".format(re_group, match[0][0]))
+            re_group = match[0]
+        _, comma, sgn, fac, name, parameters = re_group
+        if comma == ",":
+            guess_type = XCType.CORR
+        if guess_type == XCType.UNKNOWN:
+            guess_type = XCType.HYB
+        assert guess_type in [XCType.HYB, XCType.EXCH, XCType.CORR]
+        # parse fac
+        sgn = (-1)**sgn.count("-")
+        if len(fac) > 0:
+            fac = sgn * float(fac[:-1])
+        else:
+            fac = sgn
+        # parse parameters
+        if len(parameters) > 0:
+            parameters = [float(f) for f in re.split(r"[,;]", parameters[1:-1])]
+        else:
+            parameters = []
+        # parse xc type
+        xc_info = XCInfo(fac, name, parameters, XCType.UNKNOWN)
+        xc_type = cls.parse_xc_type(xc_info.name, guess_type)
+        xc_info.type = xc_type
+        return xc_info
+
+    @classmethod
+    def parse_xc_type(cls, name: str, guess_type: XCType) -> XCType:
+        """ Try to parse xc type from name.
+
+        This parsing utility generally uses PySCF, and do not check whether the exact type is.
+        For example, "0.5*B88, 0.25*B88" will give the same result of "0.75*B88".
+        Thus, for our parsing, we accept B88 as an correlation contribution currently.
+        """
+        # try libxc
+        guess_name = name
+        xc_type = XCType.UNKNOWN
+        ni = dft.numint.NumInt()
+
+        # detect simple cases of HF and RSH (RSH may have parameters, which may complicates)
+        if name == "HF":
+            return XCType.HF
+        if name in ["LR_HF", "SR_HF", "RSH"]:
+            return XCType.RSH
+
+        # detect usual cases
+        if guess_type & XCType.CORR:
+            guess_name = "," + name
+        try:
+            # try if parse_xc success (must be low_rung)
+            dft_type = ni._xc_type(guess_name)
+            if guess_type != XCType.HYB:
+                xc_type |= guess_type
+            # parse dft type
+            if dft_type == "NLC":
+                raise KeyError("NLC code (with __VV10) is not accepted currently!")
+            assert dft_type != "HF"
+            DFT_TYPE_MAP = {
+                "LDA": XCType.LDA,
+                "GGA": XCType.GGA,
+                "MGGA": XCType.MGGA,
+            }
+            xc_type |= DFT_TYPE_MAP[dft_type]
+            # parse hf type
+            rsh_and_hyb_coeff = list(ni.rsh_and_hybrid_coeff(guess_name))
+            if rsh_and_hyb_coeff[1:3] != [0, 0]:
+                xc_type |= XCType.HYB
+            else:
+                xc_type |= XCType.PURE
+            # handle type
+            # if not HYB | EXCH | CORR; then assign as HYB
+            if not ((XCType.HYB | XCType.EXCH | XCType.CORR) & xc_type):
+                xc_type |= XCType.HYB
+            # if multiple HYB | CORR, or HYB | EXCH, then assign as HYB
+            if XCType.HYB | XCType.CORR in xc_type:
+                xc_type ^= XCType.CORR
+            if XCType.HYB | XCType.EXCH in xc_type:
+                xc_type ^= XCType.EXCH
+        except KeyError:
+            # Key that is not parsible by pyscf must lies in high-rung or vdw contributions
+            # as well as must be correlation contribution
+            if not (guess_type & XCType.CORR):
+                raise KeyError(
+                    "Advanced component {:} is not low-rung exchange contribution.\n"
+                    "Please consider add a comma to separate exch and corr.".format(name))
+            if name in MP2_COMPONENTS:
+                xc_type |= XCType.MP2 | XCType.CORR
+            elif name in IEPA_COMPONENTS:
+                xc_type |= XCType.IEPA | XCType.CORR
+            elif name in RPA_COMPONENTS:
+                xc_type |= XCType.RPA | XCType.CORR
+            elif name in VDW_COMPONENTS:
+                xc_type |= XCType.VDW | XCType.CORR
+            else:
+                raise KeyError("Unknown advanced C component {:}.".format(name))
+        return xc_type
+
 
 class XCList:
     """
@@ -172,7 +287,7 @@ class XCList:
         token = token.upper().replace(" ", "")
         for key, val in _NAME_WITH_DASH.items():
             token = token.replace(key, val)
-        match = re.findall(r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;]+\))?)", token)
+        match = re.findall(REGEX_XC, token)
         # sanity check: matched patterns should be exactly equilvant to original token
         if token != "".join([group[0] for group in match]):
             raise ValueError(
@@ -211,98 +326,10 @@ class XCList:
                 xc_list += xc_list_add
                 continue
             # otherwise, parse contribution information
-            xc_info = cls.parse_xc_info(re_group, guess_type)
+            xc_info = XCInfo.parse_xc_info(re_group, guess_type)
             if not (code_scf and not (xc_info.type & XCType.RUNG_LOW)):
                 xc_list.append(xc_info)
         return xc_list
-
-    @classmethod
-    def parse_xc_info(cls, re_group: Tuple[str, ...], guess_type: XCType) -> XCInfo:
-        """ Parse xc info from regex groups.
-
-        See Also
-        --------
-        parse_token
-        """
-        _, _, sgn, fac, name, parameters = re_group
-        # parse fac
-        sgn = (-1)**sgn.count("-")
-        if len(fac) > 0:
-            fac = sgn * float(fac[:-1])
-        else:
-            fac = sgn
-        # parse parameters
-        if len(parameters) > 0:
-            parameters = [float(f) for f in re.split(r"[,;]", parameters[1:-1])]
-        else:
-            parameters = []
-        # parse xc type
-        xc_info = XCInfo(fac, name, parameters, XCType.UNKNOWN)
-        xc_type = cls.parse_xc_type(xc_info.name, guess_type)
-        xc_info.type = xc_type
-        return xc_info
-
-    @classmethod
-    def parse_xc_type(cls, name: str, guess_type: XCType) -> XCType:
-        """ Try to parse xc type from name.
-
-        This parsing utility generally uses PySCF, and do not check whether the exact type is.
-        For example, "0.5*B88, 0.25*B88" will give the same result of "0.75*B88".
-        Thus, for our parsing, we accept B88 as an correlation contribution currently.
-        """
-        # try libxc
-        guess_name = name
-        xc_type = XCType.UNKNOWN
-        ni = dft.numint.NumInt()
-
-        # detect simple cases of HF and RSH (RSH may have parameters, which may complicates)
-        if name == "HF":
-            return XCType.HF
-        if name in ["LR_HF", "SR_HF", "RSH"]:
-            return XCType.RSH
-
-        # detect usual cases
-        if guess_type & XCType.CORR:
-            guess_name = "," + name
-        try:
-            # try if parse_xc success (must be low_rung)
-            dft_type = ni._xc_type(guess_name)
-            if guess_type != XCType.HYB:
-                xc_type |= guess_type
-            # parse dft type
-            if dft_type == "NLC":
-                raise KeyError("NLC code (with __VV10) is not accepted currently!")
-            assert dft_type != "HF"
-            DFT_TYPE_MAP = {
-                "LDA": XCType.LDA,
-                "GGA": XCType.GGA,
-                "MGGA": XCType.MGGA,
-            }
-            xc_type |= DFT_TYPE_MAP[dft_type]
-            # parse hf type
-            rsh_and_hyb_coeff = list(ni.rsh_and_hybrid_coeff(guess_name))
-            if rsh_and_hyb_coeff[1:3] != [0, 0]:
-                xc_type |= XCType.HYB
-            else:
-                xc_type |= XCType.PURE
-        except KeyError:
-            # Key that is not parsible by pyscf must lies in high-rung or vdw contributions
-            # as well as must be correlation contribution
-            if not (guess_type & XCType.CORR):
-                raise KeyError(
-                    "Advanced component {:} is not low-rung exchange contribution.\n"
-                    "Please consider add a comma to separate exch and corr.".format(name))
-            if name in MP2_COMPONENTS:
-                xc_type |= XCType.MP2 | XCType.CORR
-            elif name in IEPA_COMPONENTS:
-                xc_type |= XCType.IEPA | XCType.CORR
-            elif name in RPA_COMPONENTS:
-                xc_type |= XCType.RPA | XCType.CORR
-            elif name in VDW_COMPONENTS:
-                xc_type |= XCType.VDW | XCType.CORR
-            else:
-                raise KeyError("Unknown advanced C component {:}.".format(name))
-        return xc_type
 
     # endregion
 
