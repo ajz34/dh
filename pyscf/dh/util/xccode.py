@@ -350,9 +350,8 @@ class XCList:
                 info.fac = 1
         return self
 
-    @property
-    def token(self) -> str:
-        """ Return a token that represents xc functional in a somehow standard way. """
+    def sort(self):
+        """ Sort list of xc in unique way. """
         xc_list = self.xc_list.copy()
 
         # way of sort
@@ -379,18 +378,24 @@ class XCList:
             lst.sort(key=token_for_sort)
         xc_lists_sorted_x = list(itertools.chain(*xc_lists_x))
         xc_lists_sorted_c = list(itertools.chain(*xc_lists_c))
-        # 5. combine all lists
-        token = " + ".join([info.token for info in xc_lists_sorted_x]).replace("+ -", "-")
-        if len(xc_lists_sorted_c) > 0:
-            token += ", " + " + ".join([info.token for info in xc_lists_sorted_c]).replace("+ -", "-")
+        new_list = XCList()
+        new_list.xc_list = xc_lists_sorted_x + xc_lists_sorted_c
+        # sanity check
+        if new_list != self:
+            warnings.warn("Sorted xc_list is not the same to the original xc list. Double check may required.")
+        self.xc_list = new_list.xc_list
+        return self
+
+    @property
+    def token(self) -> str:
+        """ Return a token that represents xc functional in a somehow standard way. """
+        self.sort()
+        xc_list_x = [info for info in self.xc_list if XCType.CORR not in info.type]
+        xc_list_c = [info for info in self.xc_list if XCType.CORR in info.type]
+        token = " + ".join([info.token for info in xc_list_x]).replace("+ -", "-")
+        if len(xc_list_c) > 0:
+            token += ", " + " + ".join([info.token for info in xc_list_c]).replace("+ -", "-")
         token = token.strip()
-        # 6. sanity check
-        rebuild = XCList().build_from_token(token, self.code_scf)
-        if rebuild != self:
-            warnings.warn(
-                "Returned token is not the same to the original xc list. Double check may required.\n"
-                "Original: {:}\n".format(token) +
-                "Rebuild : {:}".format(rebuild.token))
         return token
 
     def __mul__(self, other: float):
