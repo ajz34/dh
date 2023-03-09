@@ -107,7 +107,7 @@ class XCInfo:
             token += str(abs(self.fac)) + "*"
         token += self.name
         if len(self.parameters) != 0:
-            token += "(" + ";".join([str(f) for f in self.parameters]) + ")"
+            token += "(" + "; ".join([str(f) for f in self.parameters]) + ")"
         token = token.upper()
         return token
 
@@ -230,8 +230,6 @@ class XCList:
     """
     _xc_list: List[XCInfo]
     """ List of detailed exchange and correlation information. """
-    code_scf: bool
-    """ Whether this exchange-correlation represents SCF functinoal. """
 
     @property
     def xc_list(self):
@@ -257,11 +255,8 @@ class XCList:
             merging=True,
     ):
         self.xc_list = self.parse_token(token, code_scf)
-        self.code_scf = code_scf
         if merging:
-            self.merging_exx()
-            self.expand_by_spin()
-            self.trim()
+            self.merging()
         return self
 
     # region XCList parsing
@@ -331,9 +326,19 @@ class XCList:
                 xc_list.append(xc_info)
         return xc_list
 
+    def extract_by_xctype(self, xc_type: XCType) -> "XCList":
+        """ Extract xc components by type of xc. """
+        xc_list = [info for info in self.xc_list if xc_type in info.type]
+        ret = XCList()
+        ret.xc_list = xc_list
+        return ret.merging()
+
     # endregion
 
-    # region trimming and merging
+    # region merging
+
+    def merging(self):
+        return self.expand_by_spin().merging_exx().trim()
 
     def trim(self):
         """ Merge same items and remove terms that contribution coefficient (factor) is zero. """
@@ -493,8 +498,16 @@ class XCList:
         self.xc_list = new_list.xc_list
         return self
 
+    def __add__(self, other: "XCList"):
+        new_obj = self.copy()
+        new_obj += other
+        return new_obj
+
+    def __iadd__(self, other: "XCList"):
+        self.xc_list += other.xc_list
+
     def __mul__(self, other: float):
-        new_obj = copy.deepcopy(self)
+        new_obj = self.copy()
         new_obj *= other
         return new_obj
 
@@ -614,3 +627,4 @@ _NAME_WITH_DASH.update(dft.libxc._NAME_WITH_DASH)
 if __name__ == '__main__':
     l = XCList().build_from_token("XYG3", False)
     print(l.xc_list)
+    print(l.token)
