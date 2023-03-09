@@ -10,13 +10,14 @@ from pyscf.dh.energy.rdft import (
     driver_energy_dh,
     kernel_energy_restricted_exactx, kernel_energy_restricted_noxc, kernel_energy_vv10,
     kernel_energy_purexc, get_rho)
+from pyscf.dh.util import XCDH, XCList
 
 
 class RDH(lib.StreamObject):
     """ Restricted doubly hybrid class. """
     mf: dft.rks.RKS
     """ Self consistent object. """
-    xc: str or tuple
+    xc: XCDH
     """ Doubly hybrid functional exchange-correlation code. """
     params: Params
     """ Params object consisting of flags, tensors and results. """
@@ -36,7 +37,8 @@ class RDH(lib.StreamObject):
         self.params.flags.set_default_dict(util.get_default_options())
         # generate mf object
         log = lib.logger.new_logger(verbose=mf_or_mol.verbose)
-        xc_code_scf = util.extract_xc_code_low_rung(util.parse_dh_xc_code(xc, is_scf=True))
+        xc = xc if isinstance(xc, XCDH) else XCDH(xc)
+        xc_code_scf = xc.xc_scf.token
         if isinstance(mf_or_mol, gto.Mole):
             log.note("Molecule object passed-in. Generate an SCF object and evaluate SCF first.\n")
             mol = mf_or_mol
@@ -56,26 +58,25 @@ class RDH(lib.StreamObject):
                 mf = mf.density_fit(df.aug_etb(mol), only_dfj=is_ri_jonx)
         else:
             mf = mf_or_mol
-        self.mf = mf
         # transform mf if pyscf.scf instead of pyscf.dft
-        if self.mf.e_tot != 0 and not self.mf.converged:
+        if mf.e_tot != 0 and not mf.converged:
             log.warn("SCF not converged!")
         if not hasattr(mf, "xc"):
             log.warn("We only accept density functionals here.\n"
                      "If you pass an HF instance, we convert to KS object naively.")
-            self.mf = self.mf.to_rks("HF") if self.restricted else self.mf.to_uks("HF")
-            if self.mf.grids.weights is None:
-                self.mf.initialize_grids()
+            mf = mf.to_rks("HF") if self.restricted else mf.to_uks("HF")
+            if mf.grids.weights is None:
+                mf.initialize_grids()
+        self.mf = mf
         # parse xc code
-        if xc_code_scf.upper() != self.mf.xc.upper():
+        if xc_code_scf != XCList(mf.xc, code_scf=True).token:
             log.warn("xc code for SCF functional is not the same from input and SCF object!\n" +
-                     "Input xc for SCF: {:}\n".format(util.parse_dh_xc_code(xc, is_scf=True)[0]) +
+                     "Input xc for SCF: {:}\n".format(xc_code_scf) +
                      "SCF object xc   : {:}\n".format(self.mf.xc) +
-                     "Input xc for eng: {:}\n".format(xc if isinstance(xc, str) else xc[1]) +
+                     "Input xc for eng: {:}\n".format(xc.xc_eng.token) +
                      "Use SCF object xc for SCF functional, input xc for eng as energy functional.")
-            self.xc = self.mf.xc, (xc if isinstance(xc, str) else xc[1])
-        else:
-            self.xc = xc
+            xc.xc_scf = XCList(mf.xc, code_scf=True)
+        self.xc = xc
         # parse density fitting object
         self.df_ri = df_ri
         if self.df_ri is None and hasattr(mf, "with_df"):
@@ -240,7 +241,7 @@ class RDH(lib.StreamObject):
     @property
     def e_tot(self) -> float:
         """ Doubly hybrid total energy (obtained after running ``driver_energy_dh``). """
-        return self.params.results["eng_dh_{:}".format(self.xc)]
+        return self.params.results["eng_dh_{:}".format(self.xc.xc_eng.token)]
 
     def get_Y_OV(self, regenerate=False) -> np.ndarray:
         """ Get cholesky decomposed ERI in MO basis (occ-vir part with frozen core).

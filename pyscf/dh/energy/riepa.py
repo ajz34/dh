@@ -39,8 +39,6 @@ def driver_energy_riepa(mf_dh):
     """
     flags = mf_dh.params.flags
     log = mf_dh.log
-    c_os = flags["coef_os"]
-    c_ss = flags["coef_ss"]
     # parse frozen orbitals
     mo_energy_act = mf_dh.mo_energy_act
     nOcc = mf_dh.nOcc
@@ -70,7 +68,6 @@ def driver_energy_riepa(mf_dh):
 
     results = kernel_energy_riepa(
         mf_dh.params, mo_energy_act, gen_g_IJab, nOcc,
-        c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
     )
@@ -79,7 +76,7 @@ def driver_energy_riepa(mf_dh):
 
 def kernel_energy_riepa(
         params, mo_energy, gen_g_IJab, nocc,
-        c_os=1., c_ss=1., screen_func=erfc,
+        screen_func=erfc,
         thresh=1e-10, max_cycle=64,
         verbose=lib.logger.NOTE):
     """ Kernel of restricted IEPA-like methods.
@@ -217,13 +214,17 @@ def kernel_energy_riepa(
     for scheme in iepa_schemes:
         eng_aa = 0.5 * params.tensors["pair_{:}_aa".format(scheme)].sum()
         eng_ab = params.tensors["pair_{:}_ab".format(scheme)].sum()
-        eng_tot = c_os * eng_ab + 2 * c_ss * eng_aa
+        eng_os = eng_ab
+        eng_ss = 2 * eng_aa
+        eng_tot = eng_os + eng_ss
         results["eng_{:}_aa".format(scheme)] = eng_aa
         results["eng_{:}_ab".format(scheme)] = eng_ab
+        results["eng_{:}_OS".format(scheme)] = eng_os
+        results["eng_{:}_SS".format(scheme)] = eng_ss
         results["eng_{:}".format(scheme)] = eng_tot
-        log.info("[RESULT] Energy {:} of same-spin: {:18.10f}".format(scheme, eng_aa))
-        log.info("[RESULT] Energy {:} of oppo-spin: {:18.10f}".format(scheme, eng_ab))
-        log.info("[RESULT] Energy {:} of total: {:18.10f}".format(scheme, eng_tot))
+        log.info("[RESULT] Energy {:}_OS: {:18.10f}".format(scheme, eng_os))
+        log.info("[RESULT] Energy {:}_SS: {:18.10f}".format(scheme, eng_ss))
+        log.info("[RESULT] Energy {:}: {:18.10f}".format(scheme, eng_tot))
     return results
 
 

@@ -148,18 +148,19 @@ class XCInfo:
             parameters = []
         # parse xc type
         xc_info = XCInfo(fac, name, parameters, XCType.UNKNOWN)
-        xc_type = cls.parse_xc_type(xc_info.name, guess_type)
+        xc_type = cls.parse_xc_type(xc_info, guess_type)
         xc_info.type = xc_type
         return xc_info
 
     @classmethod
-    def parse_xc_type(cls, name: str, guess_type: XCType) -> XCType:
+    def parse_xc_type(cls, xc_info: "XCInfo", guess_type: XCType) -> XCType:
         """ Try to parse xc type from name.
 
         This parsing utility generally uses PySCF, and do not check whether the exact type is.
         For example, "0.5*B88, 0.25*B88" will give the same result of "0.75*B88".
         Thus, for our parsing, we accept B88 as an correlation contribution currently.
         """
+        name = xc_info.name
         # try libxc
         guess_name = name
         xc_type = XCType.UNKNOWN
@@ -177,9 +178,12 @@ class XCInfo:
         try:
             # try if parse_xc success (must be low_rung)
             dft_type = ni._xc_type(guess_name)
+            # except special cases
+            if name == "VV10" and len(xc_info.parameters) > 0:
+                raise KeyError("This VV10 is not GGA_XC_VV10, instead VV10 VDW with parameters.")
+            # parse dft type
             if guess_type != XCType.HYB:
                 xc_type |= guess_type
-            # parse dft type
             if dft_type == "NLC":
                 raise KeyError("NLC code (with __VV10) is not accepted currently!")
             assert dft_type != "HF"
@@ -199,11 +203,9 @@ class XCInfo:
             # if not HYB | EXCH | CORR; then assign as HYB
             if not ((XCType.HYB | XCType.EXCH | XCType.CORR) & xc_type):
                 xc_type |= XCType.HYB
-            # if multiple HYB | CORR, or HYB | EXCH, then assign as HYB
-            if XCType.HYB | XCType.CORR in xc_type:
-                xc_type ^= XCType.CORR
-            if XCType.HYB | XCType.EXCH in xc_type:
-                xc_type ^= XCType.EXCH
+            # if HYB, then CORR or EXCH will not exist
+            if XCType.HYB in xc_type:
+                xc_type &= ~(XCType.CORR | XCType.EXCH)
         except KeyError:
             # Key that is not parsible by pyscf must lies in high-rung or vdw contributions
             # as well as must be correlation contribution
@@ -259,6 +261,10 @@ class XCList:
             self.merging()
         return self
 
+    def build_from_list(self, xc_list: list):
+        self.xc_list = xc_list
+        return self
+
     # region XCList parsing
 
     @classmethod
@@ -309,9 +315,11 @@ class XCList:
             _, _, sgn, fac, name, parameters = re_group
             sgn = (-1)**sgn.count("-")
             fac = sgn if len(fac) == 0 else sgn * float(fac[:-1])
-            if name in FUNCTIONALS_DICT and guess_type == XCType.HYB:
+
+            FUNCTIONALS_DICT_UPPER = {key.upper(): val for (key, val) in FUNCTIONALS_DICT.items()}
+            if name in FUNCTIONALS_DICT_UPPER and guess_type == XCType.HYB:
                 assert len(parameters) == 0
-                entry = FUNCTIONALS_DICT[name]
+                entry = FUNCTIONALS_DICT_UPPER[name]
                 if code_scf:
                     xc_list_add = cls.parse_token(entry.get("code_scf", entry["code"]), code_scf)
                 else:
@@ -326,11 +334,21 @@ class XCList:
                 xc_list.append(xc_info)
         return xc_list
 
-    def extract_by_xctype(self, xc_type: XCType) -> "XCList":
-        """ Extract xc components by type of xc. """
-        xc_list = [info for info in self.xc_list if xc_type in info.type]
+    def extract_by_xctype(self, xc_type: XCType or callable) -> "XCList":
+        """ Extract xc components by type of xc.
+
+        Parameters
+        ----------
+        xc_type
+            If ``xc_type`` is ``XCType`` instance, then extract xc info by this type.
+            Otherwise, ``xc_type`` is a rule to define which type may be acceptable.
+        """
+        if isinstance(xc_type, XCType):
+            xc_list = [info for info in self.xc_list if xc_type & info.type]
+        else:
+            xc_list = [info for info in self.xc_list if xc_type(info.type)]
         ret = XCList()
-        ret.xc_list = xc_list
+        ret.xc_list = copy.deepcopy(xc_list)
         return ret.merging()
 
     # endregion
@@ -338,7 +356,7 @@ class XCList:
     # region merging
 
     def merging(self):
-        return self.expand_by_spin().merging_exx().trim()
+        return self.handle_with_os_ss().merging_exx().trim()
 
     def trim(self):
         """ Merge same items and remove terms that contribution coefficient (factor) is zero. """
@@ -376,7 +394,7 @@ class XCList:
         self.xc_list = xc_list_trimed
         return self.sort()
 
-    def expand_by_spin(self):
+    def handle_with_os_ss(self):
         """ Expand various PT2 methods by same-spin and oppo-spin coefficients.
 
         This only applies to several advanced correlations.
@@ -464,7 +482,7 @@ class XCList:
 
     def sort(self):
         """ Sort list of xc in unique way. """
-        xc_list = self.xc_list.copy()
+        xc_list = self.copy()
 
         # way of sort
         def token_for_sort(info: XCInfo):
@@ -474,17 +492,33 @@ class XCList:
             t += str(info.fac)
             return t
 
+        def exclude(l, t):
+            idx = l.index(t)
+            l.pop(idx)
+
+        def extracting(l, t):
+            if isinstance(t, XCType):
+                return [i for i in l if t & i.type]
+            else:
+                return [i for i in l if t(i.type)]
+
         # 1. split general and correlation contribution
-        xc_list_x = [info for info in xc_list if XCType.CORR not in info.type]
-        xc_list_c = [info for info in xc_list if XCType.CORR in info.type]
+        xc_list_x = extracting(xc_list, lambda t: XCType.CORR not in t)
+        xc_list_c = extracting(xc_list, XCType.CORR)
         # 2. extract HF and RSH first, then pure and hybrid
-        xc_lists_x = [
-            [info for info in xc_list_x if xctype in info.type]
-            for xctype in [XCType.HF, XCType.RSH, XCType.PURE, XCType.HYB]]
-        # 3. extract pure, MP2,
-        xc_lists_c = [
-            [info for info in xc_list_c if xctype in info.type]
-            for xctype in [XCType.PURE, XCType.MP2, XCType.IEPA, XCType.RPA, XCType.VDW]]
+        xc_lists_x = []
+        for xctype in [XCType.HF, XCType.RSH, XCType.PURE, XCType.HYB, lambda _: True]:
+            inner_list = extracting(xc_list_x, xctype)
+            for info in inner_list:
+                exclude(xc_list_x, info)
+            xc_lists_x.append(inner_list)
+        # 3. extract pure, MP2, IEPA, RPA, VDW
+        xc_lists_c = []
+        for xctype in [XCType.PURE, XCType.MP2, XCType.IEPA, XCType.RPA, XCType.VDW, lambda _: True]:
+            inner_list = extracting(xc_list_c, xctype)
+            for info in inner_list:
+                exclude(xc_list_c, info)
+            xc_lists_c.append(inner_list)
         # 4. sort each category
         for lst in xc_lists_x + xc_lists_c:
             lst.sort(key=token_for_sort)
@@ -497,6 +531,16 @@ class XCList:
             warnings.warn("Sorted xc_list is not the same to the original xc list. Double check may required.")
         self.xc_list = new_list.xc_list
         return self
+
+    def __iter__(self):
+        for info in self.xc_list:
+            yield info
+
+    def __len__(self):
+        return len(self.xc_list)
+
+    def __getitem__(self, item):
+        return self.xc_list[item]
 
     def __add__(self, other: "XCList"):
         new_obj = self.copy()
@@ -625,6 +669,6 @@ _NAME_WITH_DASH.update(dft.libxc._NAME_WITH_DASH)
 
 
 if __name__ == '__main__':
-    l = XCList().build_from_token("XYG3", False)
-    print(l.xc_list)
-    print(l.token)
+    lt = XCList().build_from_token("XYG3", False)
+    print(lt.xc_list)
+    print(lt.token)

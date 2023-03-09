@@ -29,8 +29,6 @@ def driver_energy_uiepa(mf_dh):
     """
     flags = mf_dh.params.flags
     log = mf_dh.log
-    c_os = flags["coef_os"]
-    c_ss = flags["coef_ss"]
     mo_energy_act = mf_dh.mo_energy_act
     nOcc = mf_dh.nOcc
     # kernel
@@ -72,7 +70,6 @@ def driver_energy_uiepa(mf_dh):
 
     results = kernel_energy_uiepa(
         mf_dh.params, mo_energy_act, gen_g_IJab, nOcc,
-        c_os=c_os, c_ss=c_ss,
         screen_func=mf_dh.siepa_screen,
         verbose=mf_dh.verbose
     )
@@ -81,7 +78,7 @@ def driver_energy_uiepa(mf_dh):
 
 def kernel_energy_uiepa(
         params, mo_energy, gen_g_IJab, nocc,
-        c_os=1., c_ss=1., screen_func=erfc,
+        screen_func=erfc,
         thresh=1e-10, max_cycle=64,
         verbose=lib.logger.NOTE):
     """ Kernel of restricted IEPA-like methods.
@@ -103,10 +100,6 @@ def kernel_energy_uiepa(
     nocc : list[int]
         Number of occupied molecular orbitals.
 
-    c_os : float
-        MP2 opposite-spin contribution coefficient.
-    c_ss : float
-        MP2 same-spin contribution coefficient.
     screen_func : callable
         Function used in screened IEPA. Default is erfc, as applied in functional ZRPS.
     thresh : float
@@ -211,7 +204,7 @@ def kernel_energy_uiepa(
         eng_os = eng_ss = 0
         for ssn in ("aa", "ab", "bb"):
             is_same_spin = ssn[0] == ssn[1]
-            scale = 0.25 if is_same_spin else 1
+            scale = 0.5 if is_same_spin else 1
             eng_pair = scale * params.tensors["pair_{:}_{:}".format(scheme, ssn)].sum()
             results["eng_{:}_{:}".format(scheme, ssn)] = eng_pair
             log.info("[RESULT] Energy {:} of spin {:}: {:18.10f}".format(scheme, ssn, eng_pair))
@@ -219,9 +212,13 @@ def kernel_energy_uiepa(
                 eng_ss += eng_pair
             else:
                 eng_os += eng_pair
-        eng_tot = c_os * eng_os + 2 * c_ss * eng_ss
+        eng_tot = eng_os + eng_ss
+        results["eng_{:}_OS".format(scheme)] = eng_os
+        results["eng_{:}_SS".format(scheme)] = eng_ss
         results["eng_{:}".format(scheme)] = eng_tot
-        log.info("[RESULT] Energy {:} of total: {:18.10f}".format(scheme, eng_tot))
+        log.info("[RESULT] Energy {:}_OS: {:18.10f}".format(scheme, eng_os))
+        log.info("[RESULT] Energy {:}_SS: {:18.10f}".format(scheme, eng_ss))
+        log.info("[RESULT] Energy {:}: {:18.10f}".format(scheme, eng_tot))
     return results
 
 

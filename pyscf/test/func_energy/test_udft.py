@@ -20,7 +20,7 @@ class TestUDFT(unittest.TestCase):
         mf_nonlc = dft.UKS(mol, xc="wB97M_V").density_fit(df.aug_etb(mol)).run()
         # DH object from SCF with VV10
         # note that VV10 parameters should be explicitly defined in xc_code
-        xc_code = "wB97M_V + VV10(6.0; 0.01)"
+        xc_code = "wB97M_V, VV10(6.0; 0.01)"
         mf_dh = dh.energy.UDH(mf, xc_code).run()
         self.assertTrue(np.allclose(mf_dh.e_tot, mf.e_tot, rtol=0, atol=1e-6))
         # DH object from SCF without VV10
