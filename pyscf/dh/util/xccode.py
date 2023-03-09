@@ -113,26 +113,43 @@ class XCList:
     """
     Stores exchange and correlation information and processing xc tokens.
     """
-    xc_list: List[XCInfo]
+    _xc_list: List[XCInfo]
     """ List of detailed exchange and correlation information. """
     code_scf: bool
     """ Whether this exchange-correlation represents SCF functinoal. """
 
-    def __init__(self):
+    @property
+    def xc_list(self):
+        for info in self._xc_list:
+            info.round()
+        return self._xc_list
+
+    @xc_list.setter
+    def xc_list(self, xc_list):
+        for info in xc_list:
+            info.round()
+        self._xc_list = xc_list
+
+    def __init__(self, token=None, code_scf=None, **kwargs):
         self.xc_list = []
+        if token:
+            if not isinstance(code_scf, bool):
+                raise ValueError("Must pass boolean option of `code_scf`.")
+            self.build_from_token(token, code_scf, **kwargs)
 
     def build_from_token(
             self, token: str, code_scf: bool,
-            do_expand_by_spin=True,
-            do_trim=True
+            merging=True,
     ):
         self.xc_list = self.parse_token(token, code_scf)
         self.code_scf = code_scf
-        if do_expand_by_spin:
+        if merging:
+            self.merging_exx()
             self.expand_by_spin()
-        if do_trim:
             self.trim()
         return self
+
+    # region XCList parsing
 
     @classmethod
     def parse_token(cls, token: str, code_scf: bool):
@@ -248,7 +265,7 @@ class XCList:
         if guess_type & XCType.CORR:
             guess_name = "," + name
         try:
-            # try if parse_xc success
+            # try if parse_xc success (must be low_rung)
             dft_type = ni._xc_type(guess_name)
             if guess_type != XCType.HYB:
                 xc_type |= guess_type
@@ -287,6 +304,10 @@ class XCList:
                 raise KeyError("Unknown advanced C component {:}.".format(name))
         return xc_type
 
+    # endregion
+
+    # region trimming and merging
+
     def trim(self):
         """ Merge same items and remove terms that contribution coefficient (factor) is zero. """
         xc_list_trimed = []  # type: list[XCInfo]
@@ -321,7 +342,7 @@ class XCList:
         for n in remove_index[::-1]:
             xc_list_trimed.pop(n)
         self.xc_list = xc_list_trimed
-        return self
+        return self.sort()
 
     def expand_by_spin(self):
         """ Expand various PT2 methods by same-spin and oppo-spin coefficients.
@@ -348,7 +369,66 @@ class XCList:
                 info.parameters = [0, info.fac]
                 info.name = info.name[:-3]
                 info.fac = 1
-        return self
+        return self.sort()
+
+    def merging_exx(self):
+        """ Merge HF and RSH contributions. """
+        lst_exx = [info for info in self.xc_list if info.type & XCType.EXX]
+        lst_other = [info for info in self.xc_list if not (info.type & XCType.EXX)]
+        merged = {"HF": XCInfo(0, "HF", [], XCType.HF | XCType.EXCH)}
+        for info in lst_exx:
+            if info.name == "HF":
+                merged["HF"].fac += info.fac
+            elif info.name == "LR_HF":
+                if len(info.parameters) != 1:
+                    raise KeyError("LR_HF detected ({:}) but length of parameter is not 1.".format(info.token))
+                omega = info.parameters[0]
+                if omega not in merged:
+                    merged[omega] = info
+                else:
+                    merged[omega].fac += info.fac
+            elif info.name == "SR_HF":
+                if len(info.parameters) != 1:
+                    raise KeyError("SR_HF detected ({:}) but length of parameter is not 1.".format(info.token))
+                omega = info.parameters[0]
+                if omega not in merged:
+                    merged[omega] = XCInfo(-info.fac, "LR_HF", [omega], info.type)
+                    merged["HF"].fac += info.fac
+                else:
+                    merged[omega].fac -= info.fac
+                    merged["HF"].fac += info.fac
+            elif info.name == "RSH":
+                if len(info.parameters) != 3:
+                    raise KeyError("RHF detected ({:}) but length of parameter is not 3.".format(info.token))
+                omega, alpha, beta = info.parameters
+                if omega not in merged:
+                    merged[omega] = XCInfo(-info.fac * beta, "LR_HF", [omega], info.type)
+                    merged["HF"].fac += info.fac * (alpha + beta)
+                else:
+                    merged[omega].fac += - info.fac * beta
+                    merged["HF"].fac += info.fac * (alpha + beta)
+        lst = list(merged.values()) + lst_other
+        self.xc_list = lst
+        return self.sort()
+
+    # endregion
+
+    # region XCList basic utilities
+
+    def copy(self):
+        return copy.deepcopy(self)
+
+    @property
+    def token(self) -> str:
+        """ Return a token that represents xc functional in a somehow standard way. """
+        self.sort()
+        xc_list_x = [info for info in self.xc_list if XCType.CORR not in info.type]
+        xc_list_c = [info for info in self.xc_list if XCType.CORR in info.type]
+        token = " + ".join([info.token for info in xc_list_x]).replace("+ -", "-")
+        if len(xc_list_c) > 0:
+            token += ", " + " + ".join([info.token for info in xc_list_c]).replace("+ -", "-")
+        token = token.strip()
+        return token
 
     def sort(self):
         """ Sort list of xc in unique way. """
@@ -386,18 +466,6 @@ class XCList:
         self.xc_list = new_list.xc_list
         return self
 
-    @property
-    def token(self) -> str:
-        """ Return a token that represents xc functional in a somehow standard way. """
-        self.sort()
-        xc_list_x = [info for info in self.xc_list if XCType.CORR not in info.type]
-        xc_list_c = [info for info in self.xc_list if XCType.CORR in info.type]
-        token = " + ".join([info.token for info in xc_list_x]).replace("+ -", "-")
-        if len(xc_list_c) > 0:
-            token += ", " + " + ".join([info.token for info in xc_list_c]).replace("+ -", "-")
-        token = token.strip()
-        return token
-
     def __mul__(self, other: float):
         new_obj = copy.deepcopy(self)
         new_obj *= other
@@ -414,6 +482,35 @@ class XCList:
         tokens_self.sort()
         tokens_other.sort()
         return "".join(tokens_self) == "".join(tokens_other)
+
+    # endregion
+
+
+class XCDH:
+    """ XC object for doubly hybrid functional.
+
+    One may initialize XCDH object by one string (such as "XYG3"),
+    or initialize by two strings indicating SCF and energy parts
+    (such as ["PBE", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*MP2"]).
+    """
+    xc_eng: XCList
+    """ XC list for energy evaluation. """
+    xc_scf: XCList
+    """ XC list for SCF evaluation. """
+
+    def __init__(self, token=None, **kwargs):
+        if token:
+            self.build_from_token(token, **kwargs)
+
+    def build_from_token(self, token: str or tuple or list, **kwargs):
+        if isinstance(token, (tuple, list)):
+            if len(token) != 2:
+                raise ValueError("If token passed in by tuple, then it must be two parts (scf, eng).")
+            self.xc_scf = XCList().build_from_token(token[0], True, **kwargs)
+            self.xc_eng = XCList().build_from_token(token[1], False, **kwargs)
+        else:
+            self.xc_scf = XCList().build_from_token(token, True, **kwargs)
+            self.xc_eng = XCList().build_from_token(token, False, **kwargs)
 
 
 # region modify when additional contribution added
