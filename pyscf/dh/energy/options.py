@@ -126,6 +126,12 @@ Parameters
     MP2/cr II (not recommended, restricted only)
 """
 
+omega_list_mp2 = [0]
+""" Range-separate omega list of MP2.
+
+Zero refers to no range-separate. Long/Short range uses posi/negative values.
+"""
+
 # endregion
 
 # region Coefficients

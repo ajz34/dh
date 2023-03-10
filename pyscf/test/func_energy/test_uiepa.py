@@ -110,7 +110,7 @@ class TestUIEPA(unittest.TestCase):
         mf_s = scf.UHF(mol).run()
         print(mf_s.converged)
         mf = dh.energy.UDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": ["siepa"]}):
             mf.driver_energy_iepa()
         self.assertTrue(np.allclose(mf.params.results["eng_SIEPA"], -1.354538466289851))

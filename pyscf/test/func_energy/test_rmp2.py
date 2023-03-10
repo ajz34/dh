@@ -73,7 +73,7 @@ class TestRMP2(unittest.TestCase):
         mf_s = scf.RHF(mol).run()
 
         mf = dh.energy.RDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.run()
         print(mf.params.results)
@@ -84,7 +84,7 @@ class TestRMP2(unittest.TestCase):
         mf_s = scf.RHF(mol).run()
 
         mf = dh.energy.RDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.run()
@@ -138,10 +138,10 @@ class TestRMP2(unittest.TestCase):
         int3c2e_2_cd = int3c2e_cd + 2 * lib.einsum("Ptuv, t -> Puv", -1j * int3c2e_ig1_cd, dev_xyz_B)
 
         mf = dh.energy.RDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
-        mf.df_ri._cderi = int3c2e_cd
-        mf.df_ri_2 = df.DF(mol, df.aug_etb(mol))
-        mf.df_ri_2._cderi = int3c2e_2_cd
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
+        mf.with_df._cderi = int3c2e_cd
+        mf.with_df_2 = df.DF(mol, df.aug_etb(mol))
+        mf.with_df_2._cderi = int3c2e_2_cd
 
         with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True}):
             mf.run()

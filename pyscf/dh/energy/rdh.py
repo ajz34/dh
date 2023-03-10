@@ -1,3 +1,5 @@
+import copy
+
 from pyscf import lib, gto, dft, df
 import numpy as np
 from scipy.special import erfc
@@ -21,14 +23,14 @@ class RDH(lib.StreamObject):
     """ Doubly hybrid functional exchange-correlation code. """
     params: Params
     """ Params object consisting of flags, tensors and results. """
-    df_ri: df.DF or None
+    with_df: df.DF or None
     """ Density fitting object. """
-    df_ri_2: df.DF or None
+    with_df_2: df.DF or None
     """ Density fitting object for customize ERI. Used in magnetic computation. """
     siepa_screen: callable
     """ Screen function for sIEPA. """
 
-    def __init__(self, mf_or_mol, xc, params=None, df_ri=None):
+    def __init__(self, mf_or_mol, xc, params=None, with_df=None):
         # initialize parameters
         if params:
             self.params = params
@@ -78,23 +80,23 @@ class RDH(lib.StreamObject):
             xc.xc_scf = XCList(mf.xc, code_scf=True)
         self.xc = xc
         # parse density fitting object
-        self.df_ri = df_ri
-        if self.df_ri is None and hasattr(mf, "with_df"):
+        self.with_df = with_df
+        if self.with_df is None and hasattr(mf, "with_df"):
             log.note(
                 "RI object for doubly hybrid takes as the same from SCF.\n"
                 "We do not generate new RI object by default.")
-            self.df_ri = mf.with_df
-        if self.df_ri is None:
+            self.with_df = mf.with_df
+        if self.with_df is None:
             log.note(
                 "RI object for doubly hybrid not found.\n"
                 "Generate a pyscf.df.DF object by default aug-etb settings.\n")
-            self.df_ri = df.DF(self.mol, df.aug_etb(self.mol))
+            self.with_df = df.DF(self.mol, df.aug_etb(self.mol))
         log.note(
             "To customize RI object for doubly hybrid instance,\n"
-            "please modify `mf.df_ri` to be pyscf.df.DF instance.")
+            "please modify `mf.with_df` to be pyscf.df.DF instance.")
         # parse other objects
 
-        self.df_ri_2 = None
+        self.with_df_2 = None
         self.verbose = self.mol.verbose
         self.log = lib.logger.new_logger(verbose=self.verbose)
         self.siepa_screen = erfc
@@ -252,13 +254,71 @@ class RDH(lib.StreamObject):
         if regenerate or "Y_OV" not in self.params.tensors:
             self.log.info("[INFO] Generating `Y_OV` ...")
             Y_OV = util.get_cderi_mo(
-                self.df_ri, self.mo_coeff_act, None, (0, nOcc, nOcc, nact),
+                self.with_df, self.mo_coeff_act, None, (0, nOcc, nOcc, nact),
                 self.mol.max_memory - lib.current_memory()[0])
             self.params.tensors["Y_OV"] = Y_OV
             self.log.info("[INFO] Generating `Y_OV` Done")
         else:
             Y_OV = self.params.tensors["Y_OV"]
         return Y_OV
+
+    def get_with_df_omega(self, omega, with_df=None):
+        """ Get density fitting object with specified range-separate parameter omega.
+
+        Parameters
+        ----------
+        omega : float
+            Range-separate parameter. Long/Short range uses posi/negative values.
+        with_df : df.DF
+            Density fitting instance for ao2mo transform.
+            By default, ``with_df`` object will be applied.
+
+        Returns
+        -------
+        df.DF
+            Density fitting object with specified omega.
+        """
+        if with_df is None:
+            with_df = self.with_df
+        if omega == 0:
+            return with_df
+        omega_str = "{:.6f}".format(omega)
+        if omega_str in with_df._rsh_df:
+            return with_df._rsh_df[omega_str]
+        with self.mol.with_range_coulomb(omega):
+            rsh_df = with_df._rsh_df[omega_str] = copy.copy(with_df).reset()
+            rsh_df.build()
+        return rsh_df
+
+    def get_MO_cholesky_eri(self, slc=None, with_df=None):
+        """ Get cholesky decomposed ERI incore in MO basis (occ-vir part with frozen core).
+
+        Transformation is Puv -> Ppq, where Ppq does not show symmetry.
+
+        Parameters
+        ----------
+        slc : tuple or None
+            Slice indices of selected MO.
+            Should be 4 integers, first two for p, second for q.
+            By default, all molecular orbitals are generated.
+        with_df : df.DF or None
+            Density fitting instance for ao2mo transform.
+            By default, ``with_df`` object will be applied.
+
+        Returns
+        -------
+        np.ndarray
+        """
+        self.log.info("[INFO] Generating MO cholesky eri for orbitals {:}".format(str(slc)))
+        if slc is None:
+            slc = (0, self.nmo, 0, self.nmo)
+        if with_df is None:
+            with_df = self.with_df
+        cd_eri_mo = util.get_cderi_mo(
+            with_df, self.mo_coeff, None, slc,
+            self.mol.max_memory - lib.current_memory()[0])
+        self.log.info("[INFO] Generating MO cholesky eri done")
+        return cd_eri_mo
 
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa

@@ -9,7 +9,7 @@ class TestRIEPA(unittest.TestCase):
         mol = gto.Mole(atom="O; H 1 0.94; H 1 0.94 2 104.5", basis="cc-pVTZ").build()
         mf_s = scf.RHF(mol).run()
         mf = dh.energy.RDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"iepa_scheme": "mp2"}):
             mf.driver_energy_iepa()
         print(mf.params.results)

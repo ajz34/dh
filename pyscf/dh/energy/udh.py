@@ -127,7 +127,7 @@ class UDH(RDH):
         nact, nOcc = self.nact, self.nOcc
         if regenerate or "Y_OV" not in self.params.tensors:
             Y_OV = [util.get_cderi_mo(
-                self.df_ri, self.mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
+                self.with_df, self.mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
                 self.mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
             self.params.tensors["Y_OV_a"] = Y_OV[0]

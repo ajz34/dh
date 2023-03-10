@@ -48,9 +48,9 @@ def driver_energy_ump2(mf_dh):
     elif mf_dh.params.flags["integral_scheme"].lower().startswith("ri"):
         Y_OV = mf_dh.get_Y_OV()
         Y_OV_2 = None
-        if mf_dh.df_ri_2 is not None:
+        if mf_dh.with_df_2 is not None:
             Y_OV_2 = [util.get_cderi_mo(
-                mf_dh.df_ri_2, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
+                mf_dh.with_df_2, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
                 mol.max_memory - lib.current_memory()[0]
             ) for s in (0, 1)]
         result = kernel_energy_ump2_ri(

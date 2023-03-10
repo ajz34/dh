@@ -85,14 +85,14 @@ class TestUMP2(unittest.TestCase):
         mf_s = scf.UHF(mol).run()
 
         mf = dh.energy.UDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.run()
         print(mf.params.results)
         self.assertTrue(np.allclose(mf.params.results["eng_MP2"], -0.20915836544854347))
 
         mf = dh.energy.UDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True,
                                         "frozen_list": [[0, 1], [0, 2]]}):
             mf.run()
@@ -104,7 +104,7 @@ class TestUMP2(unittest.TestCase):
         mf_s = scf.UHF(mol).run()
 
         mf = dh.energy.UDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
         mf.params.flags["frozen_rule"] = "FreezeNobleGasCore"
         with mf.params.temporary_flags({"integral_scheme": "ri"}):
             mf.run()
@@ -151,10 +151,10 @@ class TestUMP2(unittest.TestCase):
         int3c2e_2_cd = int3c2e_cd + 2 * lib.einsum("Ptuv, t -> Puv", -1j * int3c2e_ig1_cd, dev_xyz_B)
 
         mf = dh.energy.UDH(mf_s, xc="MP2")
-        mf.df_ri = df.DF(mol, df.aug_etb(mol))
-        mf.df_ri._cderi = int3c2e_cd
-        mf.df_ri_2 = df.DF(mol, df.aug_etb(mol))
-        mf.df_ri_2._cderi = int3c2e_2_cd
+        mf.with_df = df.DF(mol, df.aug_etb(mol))
+        mf.with_df._cderi = int3c2e_cd
+        mf.with_df_2 = df.DF(mol, df.aug_etb(mol))
+        mf.with_df_2._cderi = int3c2e_2_cd
 
         with mf.params.temporary_flags({"integral_scheme": "ri", "incore_t_ijab": True}):
             mf.run()
