@@ -624,6 +624,7 @@ dir_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "func
 for file_name in os.listdir(dir_functionals):
     with open(os.path.join(dir_functionals, file_name), "r") as f:
         FUNCTIONALS_DICT.update(json.load(f))
+FUNCTIONALS_DICT = {key.upper(): val for key, val in FUNCTIONALS_DICT.items()}
 
 # Handle alias for 5-th functionals
 FUNCTIONALS_DICT_ADD = dict()

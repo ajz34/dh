@@ -4,7 +4,9 @@ import numpy as np
 
 
 """
-Comparison value from MRCC 2022-03-18.
+Comparison value from
+- MRCC 2022-03-18.
+- Q-Chem (development ver)
 """
 
 
@@ -19,6 +21,7 @@ mol = gto.Mole(atom=coord, basis="cc-pVTZ", unit="AU", verbose=0).build()
 
 class TestMP2LikeDHwithMRCC(unittest.TestCase):
     def test_B2PLYP(self):
+        # reference: MRCC
         # test case: MINP_H2O_cc-pVTZ_RKS_B2PLYP
         REF_ESCF = -76.305197382056
         REF_ETOT = -76.391961061470
@@ -34,6 +37,7 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
     def test_B2GPPLYP(self):
+        # reference: MRCC
         # MINP_H2O_cc-pVTZ_DF-RKS_B2GPPLYP-D3
         # without DFT-D3
         REF_ESCF = -76.268047709113
@@ -51,6 +55,7 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
     def test_DSDPBEP86(self):
+        # reference: MRCC
         # MINP_H2O_cc-pVTZ_DF-RKS_DSDPBEP86-D3
         # without DFT-D3
         # TODO: MRCC may uses an older version of DSD-PBEP86 (10.1039/C1CP22592H).
@@ -72,6 +77,7 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         # self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
     def test_XYG3(self):
+        # reference: MRCC
         # MINP_H2O_cc-pVTZ_XYG3
         REF_ETOT = -76.400701189006
 
@@ -86,6 +92,7 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
     def test_SCAN0_2(self):
+        # reference: MRCC
         # MINP_H2O_cc-pVTZ_SCAN0-2_Libxc
         # TODO: SCAN seems to be very instable for different softwares.
         REF_ESCF = -76.204558509844
@@ -104,3 +111,19 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         print(mf.e_tot)
         # self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
         # self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
+
+    def test_LRC_XYG3(self):
+        # reference: Q-Chem
+        REF_ESCF = -109.5673226196
+        REF_ETOT = -109.5329015372
+        mol_ = gto.Mole(
+            atom="N 0 0 0.54777500; N 0 0 -0.54777500",
+            basis="6-311+G(3df,2p)").build()
+        params = dh.util.Params(flags={
+            "integral_scheme_scf": "Conv",
+            "integral_scheme": "Conv",
+        })
+        mf = dh.RDH(mol_, xc="lrc-XYG3", params=params)
+        mf.run()
+        self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
+        self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)

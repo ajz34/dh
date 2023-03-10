@@ -78,7 +78,7 @@ def driver_energy_rmp2(mf_dh):
                     frac_num=frac_num_f,
                     verbose=mf_dh.verbose)
             if omega != 0:
-                results = {util.pad_omega(key, omega): val for (key, val) in results}
+                results = {util.pad_omega(key, omega): val for (key, val) in results.items()}
             mf_dh.params.update_results(results)
         elif integral_scheme.startswith("ri"):
             # RI MP2
@@ -102,7 +102,7 @@ def driver_energy_rmp2(mf_dh):
                 max_memory=mol.max_memory - lib.current_memory()[0],
                 Y_OV_2=Y_OV_2)
             if omega != 0:
-                results = {util.pad_omega(key, omega): val for (key, val) in results}
+                results = {util.pad_omega(key, omega): val for (key, val) in results.items()}
             mf_dh.params.update_results(results)
         else:
             raise NotImplementedError("Not implemented currently!")

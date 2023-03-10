@@ -100,15 +100,33 @@ def driver_energy_dh(mf_dh):
         xc_mp2 = xc.xc_eng.extract_by_xctype(XCType.MP2 | XCType.RSMP2)
     else:
         xc_mp2 = xc.xc_eng.extract_by_xctype(XCType.RSMP2)
-    if len(xc_mp2) == 1:
+    if len(xc_mp2) > 0:
         log.info("[INFO] MP2 detected")
-        info = xc_mp2[0]
-        mf_dh.driver_energy_mp2()
-        eng = info.fac * (
-            + info.parameters[0] * mf_dh.params.results["eng_MP2_OS"]
-            + info.parameters[1] * mf_dh.params.results["eng_MP2_SS"])
-        log.info("[RESULT] energy of MP2 correlation: {:20.12f}".format(eng))
-        eng_tot += eng
+        # generate omega list
+        # parameter of RSMP2: omega, c_os, c_ss
+        omega_list = []
+        for info in xc_mp2:
+            if XCType.MP2 in info.type:
+                omega_list.append(0)
+            else:
+                assert XCType.RSMP2 in info.type
+                omega_list.append(info.parameters[0])
+        assert len(set(omega_list)) == len(omega_list)
+        # run mp2
+        with mf_dh.params.temporary_flags({"omega_list_mp2": omega_list}):
+            mf_dh.driver_energy_mp2()
+        # parse results
+        for info in xc_mp2:
+            if XCType.MP2 in info.type:
+                c_os, c_ss = info.parameters
+                omega = 0
+            else:
+                omega, c_os, c_ss = info.parameters
+            eng = info.fac * (
+                + c_os * mf_dh.params.results[util.pad_omega("eng_MP2_OS", omega)]
+                + c_ss * mf_dh.params.results[util.pad_omega("eng_MP2_SS", omega)])
+            log.info("[RESULT] energy of {:} correlation: {:20.12f}".format(util.pad_omega("MP2", omega), eng))
+            eng_tot += eng
     elif len(xc_mp2) > 1:
         raise ValueError("MP2 terms is larger than 1. Consider trim xc first.")
     # 2.3 VV10

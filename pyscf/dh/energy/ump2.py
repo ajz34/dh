@@ -65,7 +65,7 @@ def driver_energy_ump2(mf_dh):
                     frac_num=frac_num_f,
                     verbose=mf_dh.verbose)
             if omega != 0:
-                results = {util.pad_omega(key, omega): val for (key, val) in results}
+                results = {util.pad_omega(key, omega): val for (key, val) in results.items()}
             mf_dh.params.update_results(results)
         elif mf_dh.params.flags["integral_scheme"].lower().startswith("ri"):
             with_df = mf_dh.get_with_df_omega(omega)
@@ -86,7 +86,7 @@ def driver_energy_ump2(mf_dh):
                     Y_OV_2[s] = util.get_cderi_mo(
                         mf_dh.with_df_2, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
                         mol.max_memory - lib.current_memory()[0])
-            result = kernel_energy_ump2_ri(
+            results = kernel_energy_ump2_ri(
                 mo_energy_act, Y_OV,
                 t_ijab=t_ijab,
                 frac_num=frac_num_f,
@@ -94,7 +94,9 @@ def driver_energy_ump2(mf_dh):
                 max_memory=mol.max_memory - lib.current_memory()[0],
                 Y_OV_2=Y_OV_2
             )
-            mf_dh.params.update_results(result)
+            if omega != 0:
+                results = {util.pad_omega(key, omega): val for (key, val) in results.items()}
+            mf_dh.params.update_results(results)
         else:
             raise NotImplementedError("Not implemented currently!")
     return mf_dh
