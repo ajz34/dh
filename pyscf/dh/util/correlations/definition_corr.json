@@ -1,0 +1,48 @@
+{
+
+    "MP2": {
+        "type": "MP2",
+        "ref": "10.1103/PhysRev.46.618",
+        "default_parameters": [1, 1],
+        "addable": [1, 1],
+        "comment": "Parameters: (oppo-spin coeff, same-spin coeff)"
+    },
+    "IEPA": {
+        "type": "IEPA",
+        "ref": [
+            "10.1002/9780470143520.ch7",
+            "10.1002/9780470143551.ch4"
+        ],
+        "default_parameters": [1, 1],
+        "addable": [1, 1],
+        "comment": "Parameters: (oppo-spin coeff, same-spin coeff)"
+    },
+    "MP2CR": {
+        "type" : "IEPA",
+        "ref": "10.1002/(SICI)1097-461X(2000)78:4<226::AID-QUA4>3.0.CO;2-N",
+        "default_parameters": [1, 1],
+        "addable": [1, 1],
+        "comment": "Parameters: (oppo-spin coeff, same-spin coeff)"
+    },
+    "MP2CR2": {
+        "type": "IEPA",
+        "ref": "10.1002/(SICI)1097-461X(2000)78:4<226::AID-QUA4>3.0.CO;2-N",
+        "default_parameters": [1, 1],
+        "addable": [1, 1],
+        "comment": "Parameters: (oppo-spin coeff, same-spin coeff)"
+    },
+    "SIEPA": {
+        "type": "IEPA",
+        "ref": "10.1103/PhysRevLett.117.133002",
+        "default_parameters": [1, 1],
+        "addable": [1, 1],
+        "comment": "Parameters: (oppo-spin coeff, same-spin coeff). Screened function should be specified in program and default to be erfc."
+    },
+    "VV10": {
+        "type": "VDW",
+        "ref": "10.1063/1.3521275",
+        "length_parameters": 2,
+        "addable": [0, 0],
+        "comment": "Parameters: (b, C); b ~ 5.9, C ~ 0.0093; should be defined explicitly by user"
+    }
+}

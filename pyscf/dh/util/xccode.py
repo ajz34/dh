@@ -107,7 +107,7 @@ class XCInfo:
             token += str(abs(self.fac)) + "*"
         token += self.name
         if len(self.parameters) != 0:
-            token += "(" + "; ".join([str(f) for f in self.parameters]) + ")"
+            token += "(" + ", ".join([str(f) for f in self.parameters]) + ")"
         token = token.upper()
         return token
 
@@ -146,10 +146,19 @@ class XCInfo:
             parameters = [float(f) for f in re.split(r"[,;]", parameters[1:-1])]
         else:
             parameters = []
-        # parse xc type
+        # build basic information
         xc_info = XCInfo(fac, name, parameters, XCType.UNKNOWN)
+        # for advanced correlations, try to substitute alias first
+        if xc_info.name in ADV_CORR_ALIAS:
+            xc_info.name = ADV_CORR_ALIAS[xc_info.name]
+            return cls.parse_xc_info(xc_info.token, guess_type)
+        # parse xc type
         xc_type = cls.parse_xc_type(xc_info, guess_type)
         xc_info.type = xc_type
+        # fill default parameters for advanced correlations if parameters not given
+        if xc_info.name in ADV_CORR_DICT and len(xc_info.parameters) == 0:
+            if "default_parameters" in ADV_CORR_DICT[xc_info.name]:
+                xc_info.parameters = ADV_CORR_DICT[xc_info.name]["default_parameters"]
         return xc_info
 
     @classmethod
@@ -213,14 +222,14 @@ class XCInfo:
                 raise KeyError(
                     "Advanced component {:} is not low-rung exchange contribution.\n"
                     "Please consider add a comma to separate exch and corr.".format(name))
-            if name in MP2_COMPONENTS:
-                xc_type |= XCType.MP2 | XCType.CORR
-            elif name in IEPA_COMPONENTS:
-                xc_type |= XCType.IEPA | XCType.CORR
-            elif name in RPA_COMPONENTS:
-                xc_type |= XCType.RPA | XCType.CORR
-            elif name in VDW_COMPONENTS:
-                xc_type |= XCType.VDW | XCType.CORR
+            type_map = {
+                "MP2": XCType.MP2,
+                "IEPA": XCType.IEPA,
+                "RPA": XCType.RPA,
+                "VDW": XCType.VDW,
+            }
+            if name in ADV_CORR_DICT:
+                xc_type |= XCType.CORR | type_map[ADV_CORR_DICT[name]["type"]]
             else:
                 raise KeyError("Unknown advanced C component {:}.".format(name))
         return xc_type
@@ -356,69 +365,55 @@ class XCList:
     # region merging
 
     def merging(self):
-        return self.handle_with_os_ss().merging_exx().trim()
+        return self.merging_exx().trim()
 
     def trim(self):
         """ Merge same items and remove terms that contribution coefficient (factor) is zero. """
         xc_list_trimed = []  # type: list[XCInfo]
-        for info in self.xc_list:
+        for info1 in self.xc_list:
             skip_info = False
             # see if mergable
             for info2 in xc_list_trimed:
-                if info.name == info2.name and info.type == info2.type:
-                    # addable parameters: add parameters
-                    if info.name in _NAME_PARA_ADDABLE:
-                        para = info.fac * np.array(info.parameters)
-                        para2 = info2.fac * np.array(info2.parameters)
-                        info2.fac = 1
-                        info2.parameters = list(para + para2)
+                if info1.name != info2.name or info1.type != info2.type:
+                    continue
+                # not found as advanced corr, then all parameters must match
+                if info1.name not in ADV_CORR_DICT:
+                    if info1.parameters == info2.parameters:
+                        info2.fac += info1.fac
                         skip_info = True
                         break
-                    # non-addable parameters: add factor
-                    elif info.parameters == info2.parameters:
-                        info2.fac += info.fac
-                        skip_info = True
-                        break
+                # found as advanced corr, then follow definition of addable
+                else:
+                    para1 = np.array(info1.parameters)
+                    para2 = np.array(info2.parameters)
+                    addable = np.array(ADV_CORR_DICT[info1.name]["addable"], dtype=bool)
+                    if not np.allclose(para1 * ~addable, para2 * ~addable):
+                        # not addable parameters are not addable
+                        continue
+                    para_nonaddable = para1 * ~addable
+                    para_addable = info1.fac * para1 + info2.fac * para2
+                    para_addable *= addable
+                    para_new = para_nonaddable + para_addable
+                    info2.fac = 1
+                    info2.parameters = list(para_new)
+                    skip_info = True
+                    break
             if not skip_info:
-                xc_list_trimed.append(info)
+                xc_list_trimed.append(info1)
         # check values finally
         remove_index = []
         for n, info in enumerate(xc_list_trimed):
             info.round()
             if info.fac == 0:
                 remove_index.append(n)
-            if info.name in _NAME_PARA_ADDABLE and abs(np.array(info.parameters)).sum() == 0:
-                remove_index.append(n)
+            if info.name in ADV_CORR_DICT:
+                para = np.array(info.parameters)
+                addable = np.array(ADV_CORR_DICT[info.name]["addable"], dtype=bool)
+                if sum(addable) and abs(sum(para * addable)) < 1e-10:
+                    remove_index.append(n)
         for n in remove_index[::-1]:
             xc_list_trimed.pop(n)
         self.xc_list = xc_list_trimed
-        return self.sort()
-
-    def handle_with_os_ss(self):
-        """ Expand various PT2 methods by same-spin and oppo-spin coefficients.
-
-        This only applies to several advanced correlations.
-        """
-        names_concern = _NAME_WITH_OS_SS
-        names_concern_os = [s + "_OS" for s in names_concern]
-        names_concern_ss = [s + "_SS" for s in names_concern]
-        for info in self.xc_list:
-            if info.name in names_concern:
-                if len(info.parameters) == 0:
-                    info.parameters = [info.fac, info.fac]
-                    info.fac = 1
-            elif info.name in names_concern_os:
-                if len(info.parameters) != 0:
-                    raise ValueError("{:} should not have parameters.".format(info.name))
-                info.parameters = [info.fac, 0]
-                info.name = info.name[:-3]
-                info.fac = 1
-            elif info.name in names_concern_ss:
-                if len(info.parameters) != 0:
-                    raise ValueError("{:} should not have parameters.".format(info.name))
-                info.parameters = [0, info.fac]
-                info.name = info.name[:-3]
-                info.fac = 1
         return self.sort()
 
     def merging_exx(self):
@@ -599,38 +594,6 @@ class XCDH:
 
 # region modify when additional contribution added
 
-# Advanced correlation contributors
-MP2_COMPONENTS = [
-    "MP2", "MP2_OS", "MP2_SS",
-]
-
-IEPA_COMPONENTS = [
-    "MP2CR", "MP2CR_OS", "MP2CR_SS",
-    "MP2CR2", "MP2CR2_OS", "MP2CR2_SS",
-    "IEPA", "IEPA_OS", "IEPA_SS",
-    "SIEPA", "SIEPA_OS", "SIEPA_SS",
-]
-
-RPA_COMPONENTS = [
-    "DRPA",
-]
-
-VDW_COMPONENTS = [
-    "VV10",
-]
-
-# xc names that have addable parameters
-_NAME_PARA_ADDABLE = [
-    "MP2", "MP2CR", "MP2CR2", "IEPA", "SIEPA",
-]
-
-# xc names that have suffix _OS and _SS
-_NAME_WITH_OS_SS = [
-    "MP2", "MP2CR", "MP2CR2", "IEPA", "SIEPA",
-]
-
-# endregion
-
 # region parse automatically
 
 # All 5-th functional detailed dictionary
@@ -657,11 +620,18 @@ for key in FUNCTIONALS_DICT:
         FUNCTIONALS_DICT_ADD[sub_key]["see_also"] = key
 FUNCTIONALS_DICT.update(FUNCTIONALS_DICT_ADD)
 
+# advanced correlation contributors
+dir_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "correlations")
+with open(os.path.join(dir_functionals, "definition_corr.json"), "r") as f:
+    ADV_CORR_DICT = json.load(f)
+with open(os.path.join(dir_functionals, "alias.json"), "r") as f:
+    ADV_CORR_ALIAS = json.load(f)
+
 # Dashed names
 _NAME_WITH_DASH = {key.replace("_", "-"): key for key in FUNCTIONALS_DICT if "_" in key}
 _NAME_WITH_DASH.update({
     key.replace("_", "-"): key
-    for key in MP2_COMPONENTS + IEPA_COMPONENTS + RPA_COMPONENTS + VDW_COMPONENTS
+    for key in list(ADV_CORR_DICT.keys()) + list(ADV_CORR_ALIAS.keys())
     if "_" in key})
 _NAME_WITH_DASH.update(dft.libxc._NAME_WITH_DASH)
 
