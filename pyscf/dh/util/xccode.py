@@ -39,12 +39,14 @@ class XCType(Flag):
     "Low-rung (1st - 4th) approximation"
 
     MP2 = enum.auto()
-    "MP2-like correlation contribution"
+    "MP2 correlation contribution"
+    RSMP2 = enum.auto()
+    "Range-separate MP2 correlation contribution"
     IEPA = enum.auto()
     "IEPA-like correlation contribution"
     RPA = enum.auto()
     "RPA-like correlation contribution"
-    RUNG_HIGH = MP2 | IEPA | RPA
+    RUNG_HIGH = MP2 | RSMP2 | IEPA | RPA
     "High-rung (5th) approximation"
 
     VDW = enum.auto()
@@ -159,6 +161,18 @@ class XCInfo:
         if xc_info.name in ADV_CORR_DICT and len(xc_info.parameters) == 0:
             if "default_parameters" in ADV_CORR_DICT[xc_info.name]:
                 xc_info.parameters = ADV_CORR_DICT[xc_info.name]["default_parameters"]
+        # sanity check: for advanced correlations, number of parameter should be specified
+        if xc_info.name in ADV_CORR_DICT:
+            len_actual = len(xc_info.parameters)
+            len_expected = len(ADV_CORR_DICT[xc_info.name]["addable"])
+            if len_actual != len_expected:
+                raise ValueError(
+                    "Length of parameters of {:} should be {:} by design.".format(xc_info.token, len_expected))
+        # handle special cases
+        if xc_info.name == "SR_MP2":
+            # in PySCF, short range omega is usually set to be smaller than zero
+            xc_info.name = "RS_MP2"
+            xc_info.parameters[0] = - xc_info.parameters[0]
         return xc_info
 
     @classmethod
@@ -224,6 +238,7 @@ class XCInfo:
                     "Please consider add a comma to separate exch and corr.".format(name))
             type_map = {
                 "MP2": XCType.MP2,
+                "RSMP2": XCType.RSMP2,
                 "IEPA": XCType.IEPA,
                 "RPA": XCType.RPA,
                 "VDW": XCType.VDW,
@@ -511,7 +526,7 @@ class XCList:
             xc_lists_x.append(inner_list)
         # 3. extract pure, MP2, IEPA, RPA, VDW
         xc_lists_c = []
-        for xctype in [XCType.PURE, XCType.MP2, XCType.IEPA, XCType.RPA, XCType.VDW, lambda _: True]:
+        for xctype in [XCType.PURE, XCType.MP2, XCType.RSMP2, XCType.IEPA, XCType.RPA, XCType.VDW, lambda _: True]:
             inner_list = extracting(xc_list_c, xctype)
             for info in inner_list:
                 exclude(xc_list_c, info)
@@ -528,6 +543,11 @@ class XCList:
             warnings.warn("Sorted xc_list is not the same to the original xc list. Double check may required.")
         self.xc_list = new_list.xc_list
         return self
+
+    def remove(self, info: XCInfo):
+        """ Remove one term form list """
+        self.xc_list.remove(info)
+        return self.sort()
 
     def __iter__(self):
         for info in self.xc_list:

@@ -97,18 +97,20 @@ def driver_energy_dh(mf_dh):
             eng_tot += eng
     # 2.2 MP2
     if len(xc_iepa) == 0:
-        xc_mp2 = xc.xc_eng.extract_by_xctype(XCType.MP2)
-        if len(xc_mp2) == 1:
-            log.info("[INFO] MP2 detected")
-            info = xc_mp2[0]
-            mf_dh.driver_energy_mp2()
-            eng = info.fac * (
-                + info.parameters[0] * mf_dh.params.results["eng_MP2_OS"]
-                + info.parameters[1] * mf_dh.params.results["eng_MP2_SS"])
-            log.info("[RESULT] energy of MP2 correlation: {:20.12f}".format(eng))
-            eng_tot += eng
-        elif len(xc_mp2) > 1:
-            raise ValueError("MP2 terms is larger than 1. Consider trim xc first.")
+        xc_mp2 = xc.xc_eng.extract_by_xctype(XCType.MP2 | XCType.RSMP2)
+    else:
+        xc_mp2 = xc.xc_eng.extract_by_xctype(XCType.RSMP2)
+    if len(xc_mp2) == 1:
+        log.info("[INFO] MP2 detected")
+        info = xc_mp2[0]
+        mf_dh.driver_energy_mp2()
+        eng = info.fac * (
+            + info.parameters[0] * mf_dh.params.results["eng_MP2_OS"]
+            + info.parameters[1] * mf_dh.params.results["eng_MP2_SS"])
+        log.info("[RESULT] energy of MP2 correlation: {:20.12f}".format(eng))
+        eng_tot += eng
+    elif len(xc_mp2) > 1:
+        raise ValueError("MP2 terms is larger than 1. Consider trim xc first.")
     # 2.3 VV10
     xc_vdw = xc.xc_eng.extract_by_xctype(XCType.VDW)
     for info in xc_vdw:

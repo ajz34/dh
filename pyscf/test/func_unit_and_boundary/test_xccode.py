@@ -37,6 +37,10 @@ class TestXCCode(unittest.TestCase):
         xc_io(
             "wB97M_V, VV10(6.0; 0.01) + 0.5*VV10(5.9; 0.0093)",
             "WB97M_V, 0.5*VV10(5.9, 0.0093) + VV10(6, 0.01)")
+        # test rs-mp2
+        xc_io(
+            ", RS_MP2(0.5, 1, 0.5) + LR_MP2(0.5, 1, 0.8) + LR_MP2(0.3, 0.4, 1) + SR_MP2(0.3, 1, 1)",
+            ", RS_MP2(-0.3, 1, 1) + RS_MP2(0.3, 0.4, 1) + RS_MP2(0.5, 2, 1.3)")
         # test name with hyphen
         xc_io(
             "M11-L + 0.25*M06-L - 2.0*CAM-B3LYP, PBE - 0.35*LDA - 0.25*MP2cr-OS + 1.5*MP2cr",

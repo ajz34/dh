@@ -1,11 +1,22 @@
 {
-
     "MP2": {
         "type": "MP2",
         "ref": "10.1103/PhysRev.46.618",
         "default_parameters": [1, 1],
         "addable": [1, 1],
         "comment": "Parameters: (oppo-spin coeff, same-spin coeff)"
+    },
+    "RS_MP2": {
+        "type": "RSMP2",
+        "ref": "10.1002/qua.560560417",
+        "addable": [0, 1, 1],
+        "comment": "Parameters: (omega, oppo-spin coeff, same-spin-coeff)"
+    },
+    "SR_MP2": {
+        "type": "RSMP2",
+        "ref": "10.1002/qua.560560417",
+        "addable": [0, 1, 1],
+        "comment": "Parameters: (omega, oppo-spin coeff, same-spin-coeff)"
     },
     "IEPA": {
         "type": "IEPA",

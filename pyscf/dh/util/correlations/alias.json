@@ -17,5 +17,6 @@
     "SBGE2_OS": "SIEPA(1, 0)",
     "SBGE2_SS": "SIEPA(0, 1)",
     "SIEPA_OS": "SIEPA(1, 0)",
-    "SIEPA_SS": "SIEPA(0, 1)"
+    "SIEPA_SS": "SIEPA(0, 1)",
+    "LR_MP2": "RS_MP2"
 }
