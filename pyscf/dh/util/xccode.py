@@ -327,7 +327,9 @@ class XCList:
 
             FUNCTIONALS_DICT_UPPER = {key.upper(): val for (key, val) in FUNCTIONALS_DICT.items()}
             if name in FUNCTIONALS_DICT_UPPER and guess_type == XCType.HYB:
-                assert len(parameters) == 0
+                if len(parameters) != 0:
+                    raise ValueError(
+                        "XC name {:} have parameters as hybrid functional, which is not acceptable.".format(name))
                 entry = FUNCTIONALS_DICT_UPPER[name]
                 if code_scf:
                     xc_list_add = cls.parse_token(entry.get("code_scf", entry["code"]), code_scf)
