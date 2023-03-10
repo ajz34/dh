@@ -33,51 +33,82 @@ def driver_energy_ump2(mf_dh):
     mo_coeff_act = mf_dh.mo_coeff_act
     mo_energy_act = mf_dh.mo_energy_act
     frac_num_f = frac_num if frac_num is None else [frac_num[s][mask_act[s]] for s in (0, 1)]
-    # MP2 kernels
-    if mf_dh.params.flags["integral_scheme"].lower().startswith("conv"):
-        eri_or_mol = mf_dh.mf._eri
-        if eri_or_mol is None:
-            eri_or_mol = mol
-        result = kernel_energy_ump2_conv_full_incore(
-            mf_dh.params, mo_energy_act, mo_coeff_act, eri_or_mol,
-            nOcc, nVir,
-            frac_num=frac_num_f,
-            max_memory=mol.max_memory - lib.current_memory()[0],
-            verbose=mf_dh.verbose)
-        mf_dh.params.update_results(result)
-    elif mf_dh.params.flags["integral_scheme"].lower().startswith("ri"):
-        Y_OV = mf_dh.get_Y_OV()
-        Y_OV_2 = None
-        if mf_dh.with_df_2 is not None:
-            Y_OV_2 = [util.get_cderi_mo(
-                mf_dh.with_df_2, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
-                mol.max_memory - lib.current_memory()[0]
-            ) for s in (0, 1)]
-        result = kernel_energy_ump2_ri(
-            mf_dh.params, mo_energy_act, Y_OV,
-            frac_num=frac_num_f,
-            verbose=mf_dh.verbose,
-            max_memory=mol.max_memory - lib.current_memory()[0],
-            Y_OV_2=Y_OV_2
-        )
-        mf_dh.params.update_results(result)
-    else:
-        raise NotImplementedError("Not implemented currently!")
+    omega_list = mf_dh.params.flags["omega_list_mp2"]
+    integral_scheme = mf_dh.params.flags["integral_scheme"].lower()
+    for omega in omega_list:
+        # prepare t_ijab space
+        params = mf_dh.params
+        max_memory = mol.max_memory - lib.current_memory()[0]
+        incore_t_ijab = util.parse_incore_flag(
+            params.flags["incore_t_ijab"], 3 * max(nOcc) ** 2 * max(nVir) ** 2,
+            max_memory, dtype=mo_coeff_act[0].dtype)
+        if incore_t_ijab is None:
+            t_ijab = None
+        else:
+            t_ijab = [np.zeros(0)] * 3  # IDE type cheat
+            for s0, s1, ss, ssn in ((0, 0, 0, "aa"), (0, 1, 1, "ab"), (1, 1, 2, "bb")):
+                t_ijab[ss] = params.tensors.create(
+                    name=util.pad_omega("t_ijab_{:}".format(ssn), omega),
+                    shape=(nOcc[s0], nOcc[s1], nVir[s0], nVir[s1]), incore=incore_t_ijab,
+                    dtype=mo_coeff_act[0].dtype)
+
+        # MP2 kernels
+        if integral_scheme.startswith("conv"):
+            eri_or_mol = mf_dh.mf._eri if omega == 0 else mol
+            if eri_or_mol is None:
+                eri_or_mol = mol
+            with mol.with_range_coulomb(omega):
+                results = kernel_energy_ump2_conv_full_incore(
+                    mo_energy_act, mo_coeff_act, eri_or_mol,
+                    nOcc, nVir,
+                    t_ijab=t_ijab,
+                    frac_num=frac_num_f,
+                    verbose=mf_dh.verbose)
+            if omega != 0:
+                results = {util.pad_omega(key, omega): val for (key, val) in results}
+            mf_dh.params.update_results(results)
+        elif mf_dh.params.flags["integral_scheme"].lower().startswith("ri"):
+            with_df = mf_dh.get_with_df_omega(omega)
+            Y_OV = [
+                params.tensors.get(util.pad_omega("Y_OV_{:}".format(sn), omega), None)
+                for sn in ("a", "b")]
+            if Y_OV[0] is None:
+                for s, sn in [(0, "a"), (1, "b")]:
+                    Y_OV[s] = util.get_cderi_mo(
+                        with_df, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
+                        mol.max_memory - lib.current_memory()[0])
+                    params.tensors[util.pad_omega("Y_OV_{:}".format(sn), omega)] = Y_OV[s]
+            # Y_OV_2 is rarely called, so do not try to build omega for this special case
+            Y_OV_2 = None
+            if mf_dh.with_df_2 is not None:
+                Y_OV_2 = [[], []]
+                for s, sn in [(0, "a"), (1, "b")]:
+                    Y_OV_2[s] = util.get_cderi_mo(
+                        mf_dh.with_df_2, mo_coeff_act[s], None, (0, nOcc[s], nOcc[s], nact[s]),
+                        mol.max_memory - lib.current_memory()[0])
+            result = kernel_energy_ump2_ri(
+                mo_energy_act, Y_OV,
+                t_ijab=t_ijab,
+                frac_num=frac_num_f,
+                verbose=mf_dh.verbose,
+                max_memory=mol.max_memory - lib.current_memory()[0],
+                Y_OV_2=Y_OV_2
+            )
+            mf_dh.params.update_results(result)
+        else:
+            raise NotImplementedError("Not implemented currently!")
     return mf_dh
 
 
 def kernel_energy_ump2_conv_full_incore(
-        params, mo_energy, mo_coeff, eri_or_mol,
+        mo_energy, mo_coeff, eri_or_mol,
         nocc, nvir,
-        frac_num=None, max_memory=2000, verbose=lib.logger.NOTE):
+        t_ijab=None,
+        frac_num=None, verbose=lib.logger.NOTE):
     """ Kernel of unrestricted MP2 energy by conventional method.
 
     Parameters
     ----------
-    params : util.Params
-        (flag and intermediates)
-        Flags will choose how ``t_ijab`` is stored.
-        Tensors will be updated to store ``t_ijab`` if required.
     mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
     mo_coeff : list[np.ndarray]
@@ -85,6 +116,8 @@ def kernel_energy_ump2_conv_full_incore(
     eri_or_mol : np.ndarray or gto.Mole
         ERI that is recognized by ``pyscf.ao2mo.general``.
 
+    t_ijab : list[np.ndarray]
+        Store space for ``t_ijab``
     nocc : list[int]
         Number of occupied orbitals.
     nvir : list[int]
@@ -128,20 +161,6 @@ def kernel_energy_ump2_conv_full_incore(
                           .reshape(nocc[s0], nvir[s0], nocc[s1], nvir[s1])
         log.debug("Spin {:}{:} ao2mo finished".format(s0, s1))
 
-    # prepare t_ijab space
-    incore_t_ijab = util.parse_incore_flag(
-        params.flags["incore_t_ijab"], 3 * max(nocc) ** 2 * max(nvir) ** 2,
-        max_memory, dtype=mo_coeff[0].dtype)
-    if incore_t_ijab is None:
-        t_ijab = None
-    else:
-        t_ijab = [np.zeros(0)] * 3  # IDE type cheat
-        for s0, s1, ss, ssn in ((0, 0, 0, "aa"), (0, 1, 1, "ab"), (1, 1, 2, "bb")):
-            t_ijab[ss] = params.tensors.create(
-                "t_ijab_{:}".format(ssn),
-                shape=(nocc[s0], nocc[s1], nvir[s0], nvir[s1]), incore=incore_t_ijab,
-                dtype=mo_coeff[0].dtype)
-
     # loops
     eng_spin = np.array([0, 0, 0], dtype=mo_coeff[0].dtype)
     for s0, s1, ss in zip((0, 0, 1), (0, 1, 1), (0, 1, 2)):
@@ -179,7 +198,8 @@ def kernel_energy_ump2_conv_full_incore(
 
 
 def kernel_energy_ump2_ri(
-        params, mo_energy, Y_OV,
+        mo_energy, Y_OV,
+        t_ijab=None,
         frac_num=None, verbose=lib.logger.NOTE, max_memory=2000, Y_OV_2=None):
     """ Kernel of unrestricted MP2 energy by RI integral.
 
@@ -190,15 +210,13 @@ def kernel_energy_ump2_ri(
 
     Parameters
     ----------
-    params : util.Params
-        (flag and intermediates)
-        Flags will choose how ``t_ijab`` is stored.
-        Tensors will be updated to store ``t_ijab`` if required.
     mo_energy : list[np.ndarray]
         Molecular orbital energy levels.
     Y_OV : list[np.ndarray]
         Cholesky decomposed 3c2e ERI in MO basis (occ-vir part). Spin in (aa, bb).
 
+    t_ijab : list[np.ndarray]
+        Store space for ``t_ijab``
     frac_num : list[np.ndarray]
         Fractional occupation number list.
     verbose : int
@@ -229,20 +247,6 @@ def kernel_energy_ump2_ri(
 
     eo = [mo_energy[s][:nocc[s]] for s in (0, 1)]
     ev = [mo_energy[s][nocc[s]:] for s in (0, 1)]
-
-    # prepare t_ijab space
-    incore_t_ijab = util.parse_incore_flag(
-        params.flags["incore_t_ijab"], 3 * max(nocc) ** 2 * max(nvir) ** 2,
-        max_memory, dtype=Y_OV[0].dtype)
-    if incore_t_ijab is None:
-        t_ijab = None
-    else:
-        t_ijab = [np.zeros(0)] * 3  # IDE type cheat
-        for s0, s1, ss, ssn in ((0, 0, 0, "aa"), (0, 1, 1, "ab"), (1, 1, 2, "bb")):
-            t_ijab[ss] = params.tensors.create(
-                "t_ijab_{:}".format(ssn),
-                shape=(nocc[s0], nocc[s1], nvir[s0], nvir[s1]), incore=incore_t_ijab,
-                dtype=Y_OV[0].dtype)
 
     # loops
     eng_spin = np.array([0, 0, 0], dtype=Y_OV[0].dtype)

@@ -20,7 +20,8 @@ File structure
 
 from .general import HybridDict, Params, DictWithDefault
 from .helper import (
-    calc_batch_size, gen_batch, gen_leggauss_0_1, gen_leggauss_0_inf, sanity_dimension, check_real, parse_incore_flag)
+    calc_batch_size, gen_batch, gen_leggauss_0_1, gen_leggauss_0_inf, sanity_dimension, check_real, parse_incore_flag,
+    pad_omega)
 from .dferi import get_cderi_mo
 from .interface import get_default_options
 

@@ -197,3 +197,22 @@ def sanity_dimension(array, shape, weak=False):
             return
     raise ValueError("Array in dimension sanity check does not included in "
                      "upper caller function.")
+
+
+def pad_omega(s, omega):
+    """ Pad omega parameter ``_omega({:.6f})`` after string if RSH parameter omega is not zero.
+
+    Padding always returns 6 float digitals.
+
+    Parameters
+    ----------
+    s : str
+    omega : float
+
+    Returns
+    -------
+    str
+    """
+    if omega == 0:
+        return s
+    return s + "_omega({:.6f})".format(omega)

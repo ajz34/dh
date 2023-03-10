@@ -52,8 +52,8 @@ def driver_energy_rmp2(mf_dh):
     omega_list = mf_dh.params.flags["omega_list_mp2"]
     integral_scheme = mf_dh.params.flags["integral_scheme"].lower()
     for omega in omega_list:
-        # parse t_ijab
-        t_ijab_name = "t_ijab" if omega == 0 else "t_ijab_omega({:6f})".format(omega)
+        # prepare t_ijab space
+        t_ijab_name = util.pad_omega("t_ijab", omega)
         params = mf_dh.params
         max_memory = mol.max_memory - lib.current_memory()[0]
         incore_t_ijab = util.parse_incore_flag(
@@ -69,6 +69,8 @@ def driver_energy_rmp2(mf_dh):
         if integral_scheme.startswith("conv"):
             # Conventional MP2
             eri_or_mol = mf_dh.mf._eri if omega == 0 else mol
+            if eri_or_mol is None:
+                eri_or_mol = mol
             with mol.with_range_coulomb(omega):
                 results = kernel_energy_rmp2_conv_full_incore(
                     mo_energy_act, mo_coeff_act, eri_or_mol, nOcc, nVir,
@@ -76,20 +78,22 @@ def driver_energy_rmp2(mf_dh):
                     frac_num=frac_num_f,
                     verbose=mf_dh.verbose)
             if omega != 0:
-                results = {key + "_omega({:.6f})".format(omega): val for (key, val) in results}
+                results = {util.pad_omega(key, omega): val for (key, val) in results}
             mf_dh.params.update_results(results)
         elif integral_scheme.startswith("ri"):
             # RI MP2
             with_df = mf_dh.get_with_df_omega(omega)
-            Y_OV = mf_dh.get_MO_cholesky_eri(
-                slc=(mf_dh.nCore, mf_dh.nocc, mf_dh.nocc, mf_dh.nocc + mf_dh.nVir),
-                with_df=with_df)
+            Y_OV = params.tensors.get(util.pad_omega("Y_OV", omega), None)
+            if Y_OV is None:
+                Y_OV = params.tensors[util.pad_omega("Y_OV", omega)] = util.get_cderi_mo(
+                    with_df, mo_coeff_act, None, (0, nOcc, nOcc, nact),
+                    mol.max_memory - lib.current_memory()[0])
             # Y_OV_2 is rarely called, so do not try to build omega for this special case
             Y_OV_2 = None
             if mf_dh.with_df_2 is not None:
-                Y_OV_2 = mf_dh.get_MO_cholesky_eri(
-                    slc=(mf_dh.nCore, mf_dh.nocc, mf_dh.nocc, mf_dh.nocc + mf_dh.nVir),
-                    with_df=mf_dh.with_df_2)
+                Y_OV_2 = util.get_cderi_mo(
+                    mf_dh.with_df_2, mo_coeff_act, None, (0, nOcc, nOcc, nact),
+                    mol.max_memory - lib.current_memory()[0])
             results = kernel_energy_rmp2_ri(
                 mo_energy_act, Y_OV,
                 t_ijab=t_ijab,
@@ -98,7 +102,7 @@ def driver_energy_rmp2(mf_dh):
                 max_memory=mol.max_memory - lib.current_memory()[0],
                 Y_OV_2=Y_OV_2)
             if omega != 0:
-                results = {key + "_omega({:.6f})".format(omega): val for (key, val) in results}
+                results = {util.pad_omega(key, omega): val for (key, val) in results}
             mf_dh.params.update_results(results)
         else:
             raise NotImplementedError("Not implemented currently!")
