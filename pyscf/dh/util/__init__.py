@@ -27,4 +27,5 @@ from .interface import get_default_options
 
 from .helper_pyscf import (
     parse_frozen_numbers, parse_frozen_list, restricted_biorthogonalize)
-from .xccode import XCType, XCInfo, XCList, XCDH
+from .xccode.xccode import XCInfo, XCList, XCDH
+from .xccode.xctype import XCType

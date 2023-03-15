@@ -2,252 +2,17 @@
 Exchange-correlation code parsing utility for doubly hybrid
 """
 import itertools
-import json
-import os
 import re
 import copy
 import warnings
-from dataclasses import dataclass
-from typing import List, Tuple
-import enum
-from enum import Flag
+from typing import List
 import numpy as np
-from pyscf import dft
+from .xctype import XCType
+from .xcinfo import XCInfo
+from .xcjson import _NAME_WITH_DASH, FUNCTIONALS_DICT, ADV_CORR_DICT
 
 # For regex of xc token, one may try: https://regex101.com/r/YeQU5m/1
-REGEX_XC = r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;]+\))?)"
-
-
-class XCType(Flag):
-    """
-    Exchange-correlation types.
-    """
-    HF = enum.auto()
-    "Hartree-Fock"
-    RSH = enum.auto()
-    "Range-separate"
-    EXX = HF | RSH
-    "Exact exchange that requires ERI evaluation"
-
-    LDA = enum.auto()
-    "Local density approximation"
-    GGA = enum.auto()
-    "Generalized gradient approximation"
-    MGGA = enum.auto()
-    "meta-GGA"
-    RUNG_LOW = EXX | LDA | GGA | MGGA
-    "Low-rung (1st - 4th) approximation"
-
-    MP2 = enum.auto()
-    "MP2 correlation contribution"
-    RSMP2 = enum.auto()
-    "Range-separate MP2 correlation contribution"
-    IEPA = enum.auto()
-    "IEPA-like correlation contribution"
-    RPA = enum.auto()
-    "RPA-like correlation contribution"
-    RUNG_HIGH = MP2 | RSMP2 | IEPA | RPA
-    "High-rung (5th) approximation"
-
-    VDW = enum.auto()
-    "Van der Waals contribution"
-
-    CORR = enum.auto()
-    "Correlation contribution"
-    EXCH = enum.auto()
-    "Exchange contribution"
-    HYB = enum.auto()
-    "Hybrid DFA that includes multiple contributions of correlation and EXX contribution"
-    PURE = enum.auto()
-    "Pure low-rung DFA contribution that requires and only requires DFT integrand"
-
-    UNKNOWN = 0
-
-
-@dataclass
-class XCInfo:
-    """
-    Exchange-correlation information.
-
-    xc info refers to one component of exchange or correlation contribution.
-    """
-
-    fac: float
-    """ Factor of xc contribution. """
-    name: str
-    """ Name of xc contribution. """
-    parameters: List[float]
-    """ Parameters list of xc contribution. """
-    type: XCType
-    """ Type of xc contribution. """
-
-    def __init__(self, fac, name, parameters, typ):
-        self.fac = fac
-        self.name = name
-        self.parameters = parameters
-        self.type = typ
-        self.round()
-
-    def round(self, ndigits=10):
-        """ Round floats for XC factor and parameters. """
-        def adv_round(f, n):
-            if f == round(f):
-                return round(f)
-            return round(f, n)
-
-        self.fac = adv_round(self.fac, ndigits)
-        self.parameters = [adv_round(f, ndigits) for f in self.parameters]
-
-    @property
-    def token(self) -> str:
-        """ Standardlized name of XC contribution. """
-        self.round()
-        token = ""
-        if self.fac < 0:
-            token += "- "
-        if abs(self.fac) != 1:
-            token += str(abs(self.fac)) + "*"
-        token += self.name
-        if len(self.parameters) != 0:
-            token += "(" + ", ".join([str(f) for f in self.parameters]) + ")"
-        token = token.upper()
-        return token
-
-    @classmethod
-    def parse_xc_info(cls, re_group: str or Tuple[str, ...], guess_type: XCType = XCType.UNKNOWN) -> "XCInfo":
-        """ Parse xc info from regex groups.
-
-        See Also
-        --------
-        parse_token
-        """
-        if isinstance(re_group, str):
-            re_group = re_group.strip().replace(" ", "").upper()
-            match = re.findall(REGEX_XC, re_group)
-            if len(match) != 1:
-                raise ValueError("Read from info failed in that prehaps multiple info is required.")
-            if re_group != match[0][0]:
-                raise ValueError(
-                    "XC token {:} is not successfully parsed.\n"
-                    "Regex match of this token becomes {:}".format(re_group, match[0][0]))
-            re_group = match[0]
-        _, comma, sgn, fac, name, parameters = re_group
-        if comma == ",":
-            guess_type = XCType.CORR
-        if guess_type == XCType.UNKNOWN:
-            guess_type = XCType.HYB
-        assert guess_type in [XCType.HYB, XCType.EXCH, XCType.CORR]
-        # parse fac
-        sgn = (-1)**sgn.count("-")
-        if len(fac) > 0:
-            fac = sgn * float(fac[:-1])
-        else:
-            fac = sgn
-        # parse parameters
-        if len(parameters) > 0:
-            parameters = [float(f) for f in re.split(r"[,;]", parameters[1:-1])]
-        else:
-            parameters = []
-        # build basic information
-        xc_info = XCInfo(fac, name, parameters, XCType.UNKNOWN)
-        # for advanced correlations, try to substitute alias first
-        if xc_info.name in ADV_CORR_ALIAS:
-            xc_info.name = ADV_CORR_ALIAS[xc_info.name]
-            return cls.parse_xc_info(xc_info.token, guess_type)
-        # parse xc type
-        xc_type = cls.parse_xc_type(xc_info, guess_type)
-        xc_info.type = xc_type
-        # fill default parameters for advanced correlations if parameters not given
-        if xc_info.name in ADV_CORR_DICT and len(xc_info.parameters) == 0:
-            if "default_parameters" in ADV_CORR_DICT[xc_info.name]:
-                xc_info.parameters = ADV_CORR_DICT[xc_info.name]["default_parameters"]
-        # sanity check: for advanced correlations, number of parameter should be specified
-        if xc_info.name in ADV_CORR_DICT:
-            len_actual = len(xc_info.parameters)
-            len_expected = len(ADV_CORR_DICT[xc_info.name]["addable"])
-            if len_actual != len_expected:
-                raise ValueError(
-                    "Length of parameters of {:} should be {:} by design.".format(xc_info.token, len_expected))
-        # handle special cases
-        if xc_info.name == "SR_MP2":
-            # in PySCF, short range omega is usually set to be smaller than zero
-            xc_info.name = "RS_MP2"
-            xc_info.parameters[0] = - xc_info.parameters[0]
-        return xc_info
-
-    @classmethod
-    def parse_xc_type(cls, xc_info: "XCInfo", guess_type: XCType) -> XCType:
-        """ Try to parse xc type from name.
-
-        This parsing utility generally uses PySCF, and do not check whether the exact type is.
-        For example, "0.5*B88, 0.25*B88" will give the same result of "0.75*B88".
-        Thus, for our parsing, we accept B88 as an correlation contribution currently.
-        """
-        name = xc_info.name
-        # try libxc
-        guess_name = name
-        xc_type = XCType.UNKNOWN
-        ni = dft.numint.NumInt()
-
-        # detect simple cases of HF and RSH (RSH may have parameters, which may complicates)
-        if name == "HF":
-            return XCType.HF
-        if name in ["LR_HF", "SR_HF", "RSH"]:
-            return XCType.RSH
-
-        # detect usual cases
-        if guess_type & XCType.CORR:
-            guess_name = "," + name
-        try:
-            # try if parse_xc success (must be low_rung)
-            dft_type = ni._xc_type(guess_name)
-            # except special cases
-            if name == "VV10" and len(xc_info.parameters) > 0:
-                raise KeyError("This VV10 is not GGA_XC_VV10, instead VV10 VDW with parameters.")
-            # parse dft type
-            if guess_type != XCType.HYB:
-                xc_type |= guess_type
-            if dft_type == "NLC":
-                raise KeyError("NLC code (with __VV10) is not accepted currently!")
-            assert dft_type != "HF"
-            DFT_TYPE_MAP = {
-                "LDA": XCType.LDA,
-                "GGA": XCType.GGA,
-                "MGGA": XCType.MGGA,
-            }
-            xc_type |= DFT_TYPE_MAP[dft_type]
-            # parse hf type
-            rsh_and_hyb_coeff = list(ni.rsh_and_hybrid_coeff(guess_name))
-            if rsh_and_hyb_coeff[1:3] != [0, 0]:
-                xc_type |= XCType.HYB
-            else:
-                xc_type |= XCType.PURE
-            # handle type
-            # if not HYB | EXCH | CORR; then assign as HYB
-            if not ((XCType.HYB | XCType.EXCH | XCType.CORR) & xc_type):
-                xc_type |= XCType.HYB
-            # if HYB, then CORR or EXCH will not exist
-            if XCType.HYB in xc_type:
-                xc_type &= ~(XCType.CORR | XCType.EXCH)
-        except KeyError:
-            # Key that is not parsible by pyscf must lies in high-rung or vdw contributions
-            # as well as must be correlation contribution
-            if not (guess_type & XCType.CORR):
-                raise KeyError(
-                    "Advanced component {:} is not low-rung exchange contribution.\n"
-                    "Please consider add a comma to separate exch and corr.".format(name))
-            type_map = {
-                "MP2": XCType.MP2,
-                "RSMP2": XCType.RSMP2,
-                "IEPA": XCType.IEPA,
-                "RPA": XCType.RPA,
-                "VDW": XCType.VDW,
-            }
-            if name in ADV_CORR_DICT:
-                xc_type |= XCType.CORR | type_map[ADV_CORR_DICT[name]["type"]]
-            else:
-                raise KeyError("Unknown advanced C component {:}.".format(name))
-        return xc_type
+REGEX_XC = r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;-]+\))?)"
 
 
 class XCList:
@@ -519,14 +284,14 @@ class XCList:
         xc_list_c = extracting(xc_list, XCType.CORR)
         # 2. extract HF and RSH first, then pure and hybrid
         xc_lists_x = []
-        for xctype in [XCType.HF, XCType.RSH, XCType.PURE, XCType.HYB, lambda _: True]:
+        for xctype in [XCType.HF, XCType.RSH, XCType.HYB, lambda _: True]:
             inner_list = extracting(xc_list_x, xctype)
             for info in inner_list:
                 exclude(xc_list_x, info)
             xc_lists_x.append(inner_list)
         # 3. extract pure, MP2, IEPA, RPA, VDW
         xc_lists_c = []
-        for xctype in [XCType.PURE, XCType.MP2, XCType.RSMP2, XCType.IEPA, XCType.RPA, XCType.VDW, lambda _: True]:
+        for xctype in [XCType.RUNG_LOW, XCType.MP2, XCType.RSMP2, XCType.IEPA, XCType.RPA, XCType.VDW, lambda _: True]:
             inner_list = extracting(xc_list_c, xctype)
             for info in inner_list:
                 exclude(xc_list_c, info)
@@ -617,46 +382,6 @@ class XCDH:
 # region modify when additional contribution added
 
 # region parse automatically
-
-# All 5-th functional detailed dictionary
-FUNCTIONALS_DICT = dict()  # type: dict[str, dict]
-dir_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "functionals")
-for file_name in os.listdir(dir_functionals):
-    with open(os.path.join(dir_functionals, file_name), "r") as f:
-        FUNCTIONALS_DICT.update(json.load(f))
-FUNCTIONALS_DICT = {key.upper(): val for key, val in FUNCTIONALS_DICT.items()}
-
-# Handle alias for 5-th functionals
-FUNCTIONALS_DICT_ADD = dict()
-for key in FUNCTIONALS_DICT:
-    for alias in FUNCTIONALS_DICT[key].get("alias", []):
-        FUNCTIONALS_DICT_ADD[alias] = FUNCTIONALS_DICT[key]
-        FUNCTIONALS_DICT_ADD[alias]["see_also"] = key
-FUNCTIONALS_DICT.update(FUNCTIONALS_DICT_ADD)
-
-# handle underscores for 5-th functionals
-FUNCTIONALS_DICT_ADD = dict()
-for key in FUNCTIONALS_DICT:
-    sub_key = re.sub("[-_/]", "", key)
-    if sub_key != key:
-        FUNCTIONALS_DICT_ADD[sub_key] = FUNCTIONALS_DICT[key]
-        FUNCTIONALS_DICT_ADD[sub_key]["see_also"] = key
-FUNCTIONALS_DICT.update(FUNCTIONALS_DICT_ADD)
-
-# advanced correlation contributors
-dir_functionals = os.path.join(os.path.dirname(os.path.abspath(__file__)), "correlations")
-with open(os.path.join(dir_functionals, "definition_corr.json"), "r") as f:
-    ADV_CORR_DICT = json.load(f)
-with open(os.path.join(dir_functionals, "alias.json"), "r") as f:
-    ADV_CORR_ALIAS = json.load(f)
-
-# Dashed names
-_NAME_WITH_DASH = {key.replace("_", "-"): key for key in FUNCTIONALS_DICT if "_" in key}
-_NAME_WITH_DASH.update({
-    key.replace("_", "-"): key
-    for key in list(ADV_CORR_DICT.keys()) + list(ADV_CORR_ALIAS.keys())
-    if "_" in key})
-_NAME_WITH_DASH.update(dft.libxc._NAME_WITH_DASH)
 
 # endregion
 
