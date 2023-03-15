@@ -37,18 +37,24 @@ class XCList:
                 raise ValueError("Must pass boolean option of `code_scf`.")
             self.build_from_token(token, code_scf, **kwargs)
 
+    @classmethod
     def build_from_token(
-            self, token: str, code_scf: bool,
+            cls, token: str, code_scf: bool,
             trim=True,
     ):
-        self.xc_list = self.parse_token(token, code_scf)
+        xclist = cls()
+        xclist.xc_list = cls.parse_token(token, code_scf)
         if trim:
-            self.trim()
-        return self
+            xclist.trim()
+        return xclist
 
-    def build_from_list(self, xc_list: list):
-        self.xc_list = xc_list
-        return self
+    @classmethod
+    def build_from_list(cls, xc_list: list, trim=True):
+        xclist = cls()
+        xclist.xc_list = xc_list
+        if trim:
+            xclist.trim()
+        return xclist
 
     # region XCList parsing
 
@@ -300,11 +306,11 @@ class XCDH:
         if isinstance(token, (tuple, list)):
             if len(token) != 2:
                 raise ValueError("If token passed in by tuple, then it must be two parts (scf, eng).")
-            self.xc_scf = XCList().build_from_token(token[0], True, **kwargs)
-            self.xc_eng = XCList().build_from_token(token[1], False, **kwargs)
+            self.xc_scf = XCList.build_from_token(token[0], True, **kwargs)
+            self.xc_eng = XCList.build_from_token(token[1], False, **kwargs)
         else:
-            self.xc_scf = XCList().build_from_token(token, True, **kwargs)
-            self.xc_eng = XCList().build_from_token(token, False, **kwargs)
+            self.xc_scf = XCList.build_from_token(token, True, **kwargs)
+            self.xc_eng = XCList.build_from_token(token, False, **kwargs)
 
 
 # region modify when additional contribution added
@@ -315,6 +321,6 @@ class XCDH:
 
 
 if __name__ == '__main__':
-    lt = XCList().build_from_token("XYG3", False)
+    lt = XCList.build_from_token("XYG3", False)
     print(lt.xc_list)
     print(lt.token)
