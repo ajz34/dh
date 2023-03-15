@@ -15,11 +15,11 @@ class TestXCCode(unittest.TestCase):
         xc_io("PBE", "PBE")
         xc_io("PBE, PBE", "PBE, PBE")
         # test bdh
-        xc_io("B2GPPLYP", "0.65*HF + 0.35*B88, 0.64*LYP + 0.36*MP2(1, 1)")
+        xc_io("B2GPPLYP", "0.65*HF + 0.35*B88, 0.64*LYP + MP2(0.36, 0.36)")
         xc_io("B2GPPLYP", "0.65*HF + 0.35*B88, 0.64*LYP", code_scf=True)
         # test dh
-        xc_io("XYG3", "0.8033*HF + 0.2107*B88 - 0.014*LDA, 0.6789*LYP + 0.3211*MP2(1, 1)")
-        xc_io("ZRPS@PBE0", "0.5*HF + 0.5*PBE, 0.75*PBE + 0.25*SIEPA(1, 0)")
+        xc_io("XYG3", "0.8033*HF + 0.2107*B88 - 0.014*LDA, 0.6789*LYP + MP2(0.3211, 0.3211)")
+        xc_io("ZRPS@PBE0", "0.5*HF + 0.5*PBE, 0.75*PBE + SIEPA(0.25, 0)")
         xc_io("ZRPS@PBE0", "PBE0", code_scf=True)
         # test advanced parameter addition
         xc_io(

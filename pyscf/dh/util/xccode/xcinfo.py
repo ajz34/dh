@@ -328,6 +328,55 @@ class XCInfo:
             self.fac = 1
         return self
 
+    def mergable(self, other: "XCInfo") -> bool:
+        """ Check whether two terms are mergable. """
+        self.check_sanity()
+        other.check_sanity()
+        if (
+                self.name != other.name
+                or self.type != other.type
+                or self.additional != other.additional
+        ):
+            return False
+
+        lst_addable = self.type.addable_parameters()
+        assert len(self.parameters) == len(other.parameters) == len(lst_addable)
+        for n, addable in enumerate(lst_addable):
+            if not addable and self.parameters[n] != other.parameters[n]:
+                return False
+        return True
+
+    def merge(self, other: "XCInfo", inplace=False) -> "XCInfo":
+        """ Merge two exchange-correlation terms by adding factors or addable parameters. """
+        assert self.mergable(other)
+        this = self
+        other = other.copy()
+        if not inplace:
+            this = self.copy()
+        this.try_move_fac()
+        other.try_move_fac()
+
+        lst_addable = this.type.addable_parameters()
+        assert len(this.parameters) == len(other.parameters) == len(lst_addable)
+        if sum(lst_addable) == 0:
+            this.fac += other.fac
+        else:
+            for n, addable in enumerate(lst_addable):
+                if addable:
+                    this.parameters[n] += other.parameters[n]
+        return this
+
+    def is_zero(self, cutoff=1e-10):
+        """ Check if this term is zero (by checking factor or addable parameters). """
+        self.check_sanity()
+        if abs(self.fac) < cutoff:
+            return True
+        lst_addable = self.type.addable_parameters()
+        if sum(lst_addable) == 0:
+            return False
+        small = [abs(self.parameters[n]) < cutoff for n, addable in enumerate(lst_addable) if addable]
+        return all(small)
+
 
 def convertable_to_float(v):
     try:

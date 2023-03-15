@@ -6,13 +6,9 @@ import re
 import copy
 import warnings
 from typing import List
-import numpy as np
 from .xctype import XCType
-from .xcinfo import XCInfo
-from .xcjson import _NAME_WITH_DASH, FUNCTIONALS_DICT, ADV_CORR_DICT
-
-# For regex of xc token, one may try: https://regex101.com/r/YeQU5m/1
-REGEX_XC = r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;-]+\))?)"
+from .xcinfo import XCInfo, REGEX_XC
+from .xcjson import _NAME_WITH_DASH, FUNCTIONALS_DICT
 
 
 class XCList:
@@ -43,11 +39,11 @@ class XCList:
 
     def build_from_token(
             self, token: str, code_scf: bool,
-            merging=True,
+            trim=True,
     ):
         self.xc_list = self.parse_token(token, code_scf)
-        if merging:
-            self.merging()
+        if trim:
+            self.trim()
         return self
 
     def build_from_list(self, xc_list: list):
@@ -120,9 +116,13 @@ class XCList:
                 xc_list += xc_list_add
                 continue
             # otherwise, parse contribution information
-            xc_info = XCInfo.parse_xc_info(token, guess_type)
-            if not (code_scf and not (xc_info.type & XCType.RUNG_LOW)):
-                xc_list.append(xc_info)
+            xc_infos = XCInfo.parse_xc_info(token, guess_type)
+            # xc_info may be list[XCInfo], so we handle it by list
+            if not isinstance(xc_infos, list):
+                xc_infos = [xc_infos]
+            for xc_info in xc_infos:
+                if not (code_scf and not (xc_info.type & XCType.RUNG_LOW)):
+                    xc_list.append(xc_info)
         return xc_list
 
     def extract_by_xctype(self, xc_type: XCType or callable) -> "XCList":
@@ -140,14 +140,11 @@ class XCList:
             xc_list = [info for info in self.xc_list if xc_type(info.type)]
         ret = XCList()
         ret.xc_list = copy.deepcopy(xc_list)
-        return ret.merging()
+        return ret.trim()
 
     # endregion
 
     # region merging
-
-    def merging(self):
-        return self.merging_exx().trim()
 
     def trim(self):
         """ Merge same items and remove terms that contribution coefficient (factor) is zero. """
@@ -156,86 +153,17 @@ class XCList:
             skip_info = False
             # see if mergable
             for info2 in xc_list_trimed:
-                if info1.name != info2.name or info1.type != info2.type:
-                    continue
-                # not found as advanced corr, then all parameters must match
-                if info1.name not in ADV_CORR_DICT:
-                    if info1.parameters == info2.parameters:
-                        info2.fac += info1.fac
-                        skip_info = True
-                        break
-                # found as advanced corr, then follow definition of addable
-                else:
-                    para1 = np.array(info1.parameters)
-                    para2 = np.array(info2.parameters)
-                    addable = np.array(ADV_CORR_DICT[info1.name]["addable"], dtype=bool)
-                    if not np.allclose(para1 * ~addable, para2 * ~addable):
-                        # not addable parameters are not addable
-                        continue
-                    para_nonaddable = para1 * ~addable
-                    para_addable = info1.fac * para1 + info2.fac * para2
-                    para_addable *= addable
-                    para_new = para_nonaddable + para_addable
-                    info2.fac = 1
-                    info2.parameters = list(para_new)
+                if info2.mergable(info1):
+                    info2.merge(info1, inplace=True)
                     skip_info = True
                     break
             if not skip_info:
                 xc_list_trimed.append(info1)
         # check values finally
-        remove_index = []
-        for n, info in enumerate(xc_list_trimed):
-            info.round()
-            if info.fac == 0:
-                remove_index.append(n)
-            if info.name in ADV_CORR_DICT:
-                para = np.array(info.parameters)
-                addable = np.array(ADV_CORR_DICT[info.name]["addable"], dtype=bool)
-                if sum(addable) and abs(sum(para * addable)) < 1e-10:
-                    remove_index.append(n)
+        remove_index = [n for n, info in enumerate(xc_list_trimed) if info.is_zero()]
         for n in remove_index[::-1]:
             xc_list_trimed.pop(n)
         self.xc_list = xc_list_trimed
-        return self.sort()
-
-    def merging_exx(self):
-        """ Merge HF and RSH contributions. """
-        lst_exx = [info for info in self.xc_list if info.type & XCType.EXX]
-        lst_other = [info for info in self.xc_list if not (info.type & XCType.EXX)]
-        merged = {"HF": XCInfo(0, "HF", [], XCType.HF | XCType.EXCH)}
-        for info in lst_exx:
-            if info.name == "HF":
-                merged["HF"].fac += info.fac
-            elif info.name == "LR_HF":
-                if len(info.parameters) != 1:
-                    raise KeyError("LR_HF detected ({:}) but length of parameter is not 1.".format(info.token))
-                omega = info.parameters[0]
-                if omega not in merged:
-                    merged[omega] = info
-                else:
-                    merged[omega].fac += info.fac
-            elif info.name == "SR_HF":
-                if len(info.parameters) != 1:
-                    raise KeyError("SR_HF detected ({:}) but length of parameter is not 1.".format(info.token))
-                omega = info.parameters[0]
-                if omega not in merged:
-                    merged[omega] = XCInfo(-info.fac, "LR_HF", [omega], info.type)
-                    merged["HF"].fac += info.fac
-                else:
-                    merged[omega].fac -= info.fac
-                    merged["HF"].fac += info.fac
-            elif info.name == "RSH":
-                if len(info.parameters) != 3:
-                    raise KeyError("RHF detected ({:}) but length of parameter is not 3.".format(info.token))
-                omega, alpha, beta = info.parameters
-                if omega not in merged:
-                    merged[omega] = XCInfo(-info.fac * beta, "LR_HF", [omega], info.type)
-                    merged["HF"].fac += info.fac * (alpha + beta)
-                else:
-                    merged[omega].fac += - info.fac * beta
-                    merged["HF"].fac += info.fac * (alpha + beta)
-        lst = list(merged.values()) + lst_other
-        self.xc_list = lst
         return self.sort()
 
     # endregion
@@ -284,7 +212,7 @@ class XCList:
         xc_list_c = extracting(xc_list, XCType.CORR)
         # 2. extract HF and RSH first, then pure and hybrid
         xc_lists_x = []
-        for xctype in [XCType.HF, XCType.RSH, XCType.HYB, lambda _: True]:
+        for xctype in [XCType.HF, XCType.RSH, XCType.EXCH, XCType.HYB, lambda _: True]:
             inner_list = extracting(xc_list_x, xctype)
             for info in inner_list:
                 exclude(xc_list_x, info)
