@@ -1,16 +1,29 @@
 """
 Information of one exchange-correlation term
-"""
 
+Notes
+-----
+For regex of xc token, one may try: https://regex101.com/r/xnD5jM/1
+
+Groups of regex search
+
+0. match all token for an entire xc code for one term
+1. match if comma in string; if exists, then split exchange and correlation parts (pyscf convention);
+2. sign of factor
+3. factor (absolute value) with asterisk
+4. name of xc term (dash not allowed)
+5. list of parameters with parentheses (words allowed, splited by comma or semicolon)
+"""
+import copy
 from dataclasses import dataclass
 import re
-from typing import Tuple
+from typing import List
 from .xctype import XCType
 from .xcjson import ADV_CORR_ALIAS, ADV_CORR_DICT
 from pyscf import dft
 
 
-REGEX_XC = r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([0-9.,;-]+\))?)"
+REGEX_XC = r"((,?)([+-]*)([0-9.]+\*)?([\w@]+)(\([\w+\-\*.,;]+\))?)"
 
 
 @dataclass
@@ -30,7 +43,7 @@ class XCInfo:
     type: XCType
     """ Type of xc contribution. """
     additional: dict
-    """ Additional parameters.
+    """ (experimental) Additional parameters.
     
     Parameters that is not sutiable to be passed as string token, or very advanced parameters.
     """
@@ -43,7 +56,7 @@ class XCInfo:
         self.additional = dict()
         self.round()
 
-    def round(self, ndigits=10):
+    def round(self, ndigits=10) -> "XCInfo":
         """ Round floats for XC factor and parameters. """
         def adv_round(f, n):
             if f == round(f):
@@ -51,11 +64,15 @@ class XCInfo:
             return round(f, n)
 
         self.fac = adv_round(self.fac, ndigits)
-        self.parameters = [adv_round(f, ndigits) if isinstance(f, float) else str(f) for f in self.parameters]
+        self.parameters = [adv_round(f, ndigits) if isinstance(f, (float, int)) else str(f) for f in self.parameters]
+        return self
 
     @property
     def token(self) -> str:
-        """ Standardlized name of XC contribution. """
+        """ Standardlized name of XC contribution.
+
+        Note that additional parameter is not considered.
+        """
         self.round()
         token = ""
         if self.fac < 0:
@@ -69,101 +86,110 @@ class XCInfo:
         return token
 
     @classmethod
-    def parse_xc_info(cls, re_group: str or Tuple[str, ...], guess_type: XCType = XCType.UNKNOWN) -> "XCInfo":
+    def parse_xc_info(cls, inp: str, guess_type: XCType = XCType.UNKNOWN) -> "XCInfo" or List["XCInfo"]:
         """ Parse xc info from regex groups.
 
         See Also
         --------
         parse_token
         """
-        if isinstance(re_group, str):
-            re_group = re_group.strip().replace(" ", "").upper()
-            match = re.findall(REGEX_XC, re_group)
-            if len(match) != 1:
-                raise ValueError("Read from info failed in that prehaps multiple info is required.")
-            if re_group != match[0][0]:
-                raise ValueError(
-                    "XC token {:} is not successfully parsed.\n"
-                    "Regex match of this token becomes {:}".format(re_group, match[0][0]))
-            re_group = match[0]
-        _, comma, sgn, fac, name, parameters = re_group
+        # parse input by regex
+        inp = inp.strip().replace(" ", "").upper()
+        match = re.findall(REGEX_XC, inp)
+        if len(match) != 1:
+            raise ValueError("Read from info failed in that prehaps multiple info is required.")
+        if inp != match[0][0]:
+            raise ValueError(
+                "XC token {:} is not successfully parsed.\n"
+                "Regex match of this token becomes {:}".format(inp, match[0][0]))
+        inp = match[0]
+        _, comma, sgn, fac, name, parameters = inp
+
+        # additional check for guess type of correlation
         if comma == ",":
             guess_type = XCType.CORR
         if guess_type == XCType.UNKNOWN:
             guess_type = XCType.HYB
         assert guess_type in [XCType.HYB, XCType.EXCH, XCType.CORR]
+
         # parse fac
         sgn = (-1)**sgn.count("-")
         if len(fac) > 0:
             fac = sgn * float(fac[:-1])
         else:
             fac = sgn
+
         # parse parameters
+        def try_convert_float(s):
+            try:
+                return float(s)
+            except ValueError:
+                return s
+
         if len(parameters) > 0:
-            parameters = [float(f) for f in re.split(r"[,;]", parameters[1:-1])]
+            parameters = [try_convert_float(item) for item in re.split(r"[,;]", parameters[1:-1])]
         else:
             parameters = []
+
         # build basic information
         xc_info = XCInfo(fac, name, parameters, XCType.UNKNOWN)
         # for advanced correlations, try to substitute alias first
         if xc_info.name in ADV_CORR_ALIAS:
             xc_info.name = ADV_CORR_ALIAS[xc_info.name]
             return cls.parse_xc_info(xc_info.token, guess_type)
+
         # parse xc type
         xc_type = cls.parse_xc_type(xc_info, guess_type)
         xc_info.type = xc_type
-        # fill default parameters for advanced correlations if parameters not given
-        if xc_info.name in ADV_CORR_DICT and len(xc_info.parameters) == 0:
-            if "default_parameters" in ADV_CORR_DICT[xc_info.name]:
-                xc_info.parameters = ADV_CORR_DICT[xc_info.name]["default_parameters"]
-        # sanity check: for advanced correlations, number of parameter should be specified
-        if xc_info.name in ADV_CORR_DICT:
-            len_actual = len(xc_info.parameters)
-            len_expected = len(ADV_CORR_DICT[xc_info.name]["addable"])
-            if len_actual != len_expected:
-                raise ValueError(
-                    "Length of parameters of {:} should be {:} by design.".format(xc_info.token, len_expected))
+
         # handle special cases
-        if xc_info.name == "SR_MP2":
-            # in PySCF, short range omega is usually set to be smaller than zero
-            xc_info.name = "RS_MP2"
-            xc_info.parameters[0] = - xc_info.parameters[0]
+        # SR_HF and RSH
+        handled_rsh = cls.handle_rsh(xc_info)
+        if handled_rsh is not None:
+            return handled_rsh
+        # SR_MP2
+        handled_sr_mp2 = cls.handle_sr_mp2(xc_info)
+        if handled_sr_mp2 is not None:
+            return handled_sr_mp2
+
+        # fill default parameters
+        xc_info = cls.parse_default_parameters(xc_info)
+
+        # finalize
+        xc_info.check_sanity()
+        xc_info = xc_info.try_move_fac()
+        xc_info.round()
         return xc_info
 
     @classmethod
     def parse_xc_type(cls, xc_info: "XCInfo", guess_type: XCType) -> XCType:
-        """ Try to parse xc type from name.
-
-        This parsing utility generally uses PySCF, and do not check whether the exact type is.
-        For example, "0.5*B88, 0.25*B88" will give the same result of "0.75*B88".
-        Thus, for our parsing, we accept B88 as an correlation contribution currently.
-        """
+        """ Try to parse xc type from name. """
+        assert guess_type in [XCType.HYB, XCType.CORR, XCType.EXCH]
         name = xc_info.name
-        # try libxc
         guess_name = name
         xc_type = XCType.UNKNOWN
         ni = dft.numint.NumInt()
 
         # detect simple cases of HF and RSH (RSH may have parameters, which may complicates)
         if name == "HF":
-            return XCType.HF
+            return XCType.HF | XCType.EXCH
         if name in ["LR_HF", "SR_HF", "RSH"]:
-            return XCType.RSH
+            return XCType.RSH | XCType.EXCH
 
         # detect usual cases
         if guess_type & XCType.CORR:
             guess_name = "," + name
         try:
-            # try if parse_xc success (must be low_rung)
+            # try if pyscf parse_xc success (must be low_rung)
             dft_type = ni._xc_type(guess_name)
             # except special cases
             if name == "VV10" and len(xc_info.parameters) > 0:
-                raise KeyError("This VV10 is not GGA_XC_VV10, instead VV10 VDW with parameters.")
+                raise KeyError("We use VV10 as vDW correction with parameters, instead of XC_GGA_XC_VV10.")
             # parse dft type
             if guess_type != XCType.HYB:
                 xc_type |= guess_type
             if dft_type == "NLC":
-                raise KeyError("NLC code (with __VV10) is not accepted currently!")
+                raise KeyError("NLC code (with __VV10 by PySCF) is not accepted currently!")
             assert dft_type != "HF"
             DFT_TYPE_MAP = {
                 "LDA": XCType.LDA,
@@ -175,8 +201,6 @@ class XCInfo:
             rsh_and_hyb_coeff = list(ni.rsh_and_hybrid_coeff(guess_name))
             if rsh_and_hyb_coeff[1:3] != [0, 0]:
                 xc_type |= XCType.HYB
-            else:
-                xc_type |= XCType.PURE
             # handle type
             # if not HYB | EXCH | CORR; then assign as HYB
             if not ((XCType.HYB | XCType.EXCH | XCType.CORR) & xc_type):
@@ -186,7 +210,19 @@ class XCInfo:
                 xc_type &= ~(XCType.CORR | XCType.EXCH)
         except KeyError:
             # Key that is not parsible by pyscf must lies in high-rung or vdw contributions
-            # as well as must be correlation contribution
+            # SSR (scaled short-range)
+            if name == "SSR":
+                if guess_type == XCType.HYB:
+                    raise ValueError(
+                        "Function by SSR should be explicitly defined as exchange or correlation functional, "
+                        "i.e., split exch-corr by comma.")
+                xc_type |= guess_type | XCType.SSR
+                # further parse token in parameter
+                inner_info = cls.parse_xc_info(xc_info.parameters[0], guess_type=guess_type)
+                assert inner_info.type & XCType.RUNG_LOW and not inner_info.type & XCType.EXX
+                xc_type |= inner_info.type & XCType.RUNG_LOW
+                return xc_type
+            # advanced correlation and vdw
             if not (guess_type & XCType.CORR):
                 raise KeyError(
                     "Advanced component {:} is not low-rung exchange contribution.\n"
@@ -204,3 +240,98 @@ class XCInfo:
                 raise KeyError("Unknown advanced C component {:}.".format(name))
         return xc_type
 
+    @classmethod
+    def parse_default_parameters(cls, xc_info: "XCInfo") -> "XCInfo":
+        """ Fill addable parameters (or setting default parameters for future possible API usage). """
+        # not listed in definition of parameters
+        lst_addable = xc_info.type.addable_parameters()
+        # listed in definition of parameters
+        if len(xc_info.parameters) == len(lst_addable):
+            # additional check that if addable parameters is number
+            for n, addable in enumerate(lst_addable):
+                if addable and not convertable_to_float(xc_info.parameters[n]):
+                    raise ValueError("Some parameters that should be addable is not float number!")
+            return xc_info
+        elif len(xc_info.parameters) == len(lst_addable) - sum(lst_addable):
+            # fill in addable parameters
+            n1 = 0
+            parameter_new = []
+            for n, addable in enumerate(lst_addable):
+                if not addable:
+                    parameter_new.append(xc_info.parameters[n1])
+                    n1 += 1
+                else:
+                    parameter_new.append(1)
+            xc_info.parameters = parameter_new
+            return xc_info
+        else:
+            raise ValueError("Number of parameter number is probably not correct for term {:}!".format(xc_info.token))
+
+    @classmethod
+    def handle_rsh(cls, info: "XCInfo") -> None or List["XCInfo"]:
+        """ Parse RSH parameters """
+        info.round()
+        if info.name == "SR_HF" or (info.name == "LR_HF" and info.parameters[0] < 0):
+            assert len(info.parameters) == 1
+            token_hf = "{:}*HF".format(str(info.fac))
+            token_lr_hf = "{:}*LR_HF({:})".format(str(- info.fac), str(info.parameters[0]))
+            return [
+                cls.parse_xc_info(token_hf),
+                cls.parse_xc_info(token_lr_hf)]
+        if info.name == "RSH":
+            assert len(info.parameters) == 3
+            omega, alpha, beta = info.parameters
+            token_hf = "{:}*HF".format(str(info.fac * (alpha + beta)))
+            token_lr_hf = "{:}*LR_HF({:})".format(str(- info.fac * beta), str(omega))
+            return [
+                cls.parse_xc_info(token_hf),
+                cls.parse_xc_info(token_lr_hf)]
+        return None
+
+    @classmethod
+    def handle_sr_mp2(cls, info: "XCInfo") -> None or "XCInfo":
+        """ Change SR_MP2 to RS_MP2.
+
+        By PySCF's notation, short-range is realized by setting omega to be smaller than zero.
+        """
+        info.round()
+        if info.name == "SR_MP2":
+            info = info.copy()
+            info.name = "RS_MP2"
+            info.parameters[0] *= -1
+            return cls.parse_xc_info(info.token, XCType.CORR)
+        return None
+
+    def copy(self) -> "XCInfo":
+        return copy.deepcopy(self)
+
+    def check_sanity(self):
+        """ Check sanity for parameter and flags. """
+        self.type.check_sanity()
+        self.round()
+        lst_addable = self.type.addable_parameters()
+        assert len(self.parameters) == len(lst_addable)
+        # additional check that if addable parameters is number
+        for n, addable in enumerate(lst_addable):
+            if addable and not convertable_to_float(self.parameters[n]):
+                raise ValueError("Some parameters that should be addable is not float number!")
+
+    def try_move_fac(self):
+        """ Try to move outer factor into addable parameters. """
+        self.check_sanity()
+        lst_addable = self.type.addable_parameters()
+        if sum(lst_addable) > 0:
+            fac = self.fac
+            for n, addable in enumerate(lst_addable):
+                if addable:
+                    self.parameters[n] *= fac
+            self.fac = 1
+        return self
+
+
+def convertable_to_float(v):
+    try:
+        float(v)
+        return True
+    except ValueError:
+        return False

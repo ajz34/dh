@@ -1,3 +1,25 @@
+"""
+Type of exchange-correlation
+
+Notes
+-----
+Parameters of exchange-correlation are also defined in this module.
+
+Program functionality of parameter handling lies in ``XCInfo``, however, import definition exists here.
+
+Except for special cases, parameter table should be defined as follows. For example of RSMP2,
+
+- parameter of this type is ([explanation, addability])
+    - ["range-separate omega", False],
+    - ["oppo-spin coefficient", True],
+    - ["same-spin coefficient", True],
+- parameter list in program is something like (0.7, 1.3, 0.6);
+- input parameter (0.7), then set parameter list (0.7, 1, 1),
+  i.e., addable parameter filled by one if addable;
+- canonical representation of ``0.6*RSMP2(0.7, 1.3, 0.6)`` should be ``RSMP2(0.7, 0.78, 0.36)``,
+  i.e., if there is addable parameters, then coefficient factor may be multiplied into these parameters.
+"""
+
 import enum
 from enum import Flag
 
@@ -57,13 +79,13 @@ class XCType(Flag):
 
     # region special configurations
     SSR = enum.auto()
-    "Short separate-range"
+    "Scaled short-range"
     # endregion
 
     UNKNOWN = 0
 
     def check_sanity(self):
-        """ Check contradictory flags. """
+        """ Check contradictory flags or must-exist flags. """
 
         # check contradictory
         def contradictory(*args):
@@ -80,6 +102,7 @@ class XCType(Flag):
         contradictory(*decompose(self.RUNG_HIGH))
         contradictory(*decompose(self.VDW))
         contradictory(self.CORR, self.EXCH, self.HYB)
+        contradictory(self.RUNG_HIGH, self.RUNG_LOW, self.VDW)
 
         # check special rules
         # SSR
@@ -90,8 +113,12 @@ class XCType(Flag):
         # additional check for parameters list
         contradictory(*self.def_parameters().keys())
 
+        # must exist flags
+        assert (self.EXCH | self.CORR | self.HYB) & self
+        assert (self.RUNG_HIGH | self.RUNG_LOW | self.VDW) & self
+
     @classmethod
-    def def_parameters(cls):
+    def def_parameters(cls) -> dict:
         """ Definition dictionary of addability of parameter list for XCInfo.
 
         If some xc type is not listed, then this type should not have a parameter.
@@ -124,8 +151,9 @@ class XCType(Flag):
         }
         return dct
 
-    def addable_parameters(self):
+    def addable_parameters(self) -> list:
         """ List of addability of parameters """
-        if self not in self.def_parameters():
-            return False
-        return [lst[1] for lst in self.def_parameters()[self]]
+        for key in self.def_parameters():
+            if key in self:
+                return [lst[1] for lst in self.def_parameters()[key]]
+        return []

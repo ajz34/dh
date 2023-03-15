@@ -101,7 +101,7 @@ class XCList:
             else:
                 guess_type = XCType.CORR
             # see if is known doubly hybrid functional
-            _, _, sgn, fac, name, parameters = re_group
+            token, _, sgn, fac, name, parameters = re_group
             sgn = (-1)**sgn.count("-")
             fac = sgn if len(fac) == 0 else sgn * float(fac[:-1])
 
@@ -120,7 +120,7 @@ class XCList:
                 xc_list += xc_list_add
                 continue
             # otherwise, parse contribution information
-            xc_info = XCInfo.parse_xc_info(re_group, guess_type)
+            xc_info = XCInfo.parse_xc_info(token, guess_type)
             if not (code_scf and not (xc_info.type & XCType.RUNG_LOW)):
                 xc_list.append(xc_info)
         return xc_list
