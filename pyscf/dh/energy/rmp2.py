@@ -82,7 +82,7 @@ def driver_energy_rmp2(mf_dh):
             mf_dh.params.update_results(results)
         elif integral_scheme.startswith("ri"):
             # RI MP2
-            with_df = mf_dh.get_with_df_omega(omega)
+            with_df = util.get_with_df_omega(mf_dh.with_df, omega)
             Y_OV = params.tensors.get(util.pad_omega("Y_OV", omega), None)
             if Y_OV is None:
                 Y_OV = params.tensors[util.pad_omega("Y_OV", omega)] = util.get_cderi_mo(

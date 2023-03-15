@@ -262,34 +262,6 @@ class RDH(lib.StreamObject):
             Y_OV = self.params.tensors["Y_OV"]
         return Y_OV
 
-    def get_with_df_omega(self, omega, with_df=None):
-        """ Get density fitting object with specified range-separate parameter omega.
-
-        Parameters
-        ----------
-        omega : float
-            Range-separate parameter. Long/Short range uses posi/negative values.
-        with_df : df.DF
-            Density fitting instance for ao2mo transform.
-            By default, ``with_df`` object will be applied.
-
-        Returns
-        -------
-        df.DF
-            Density fitting object with specified omega.
-        """
-        if with_df is None:
-            with_df = self.with_df
-        if omega == 0:
-            return with_df
-        omega_str = "{:.6f}".format(omega)
-        if omega_str in with_df._rsh_df:
-            return with_df._rsh_df[omega_str]
-        with self.mol.with_range_coulomb(omega):
-            rsh_df = with_df._rsh_df[omega_str] = copy.copy(with_df).reset()
-            rsh_df.build()
-        return rsh_df
-
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa
     driver_energy_dh = driver_energy_dh

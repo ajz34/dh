@@ -68,7 +68,7 @@ def driver_energy_ump2(mf_dh):
                 results = {util.pad_omega(key, omega): val for (key, val) in results.items()}
             mf_dh.params.update_results(results)
         elif mf_dh.params.flags["integral_scheme"].lower().startswith("ri"):
-            with_df = mf_dh.get_with_df_omega(omega)
+            with_df = util.get_with_df_omega(mf_dh.with_df, omega)
             Y_OV = [
                 params.tensors.get(util.pad_omega("Y_OV_{:}".format(sn), omega), None)
                 for sn in ("a", "b")]
