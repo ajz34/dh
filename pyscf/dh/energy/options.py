@@ -159,3 +159,19 @@ coef_ss = 1
 """ Coefficient of same-spin contribution to MP2 energy. """
 
 # endregion
+
+# region Functional specific
+
+ssr_x_fr = "LDA_X"
+""" Full-range exchange functional for scaled short-range method. """
+
+ssr_x_sr = "LDA_X_ERF"
+""" Short-range exchange functional for scaled short-range method. """
+
+ssr_c_fr = "LDA_C_PW"
+""" Full-range correlation functional for scaled short-range method. """
+
+ssr_c_sr = "LDA_C_PW_ERF"
+""" Short-range correlation functional for scaled short-range method. """
+
+# endregion

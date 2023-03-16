@@ -1,4 +1,5 @@
 import typing
+from types import MethodType
 
 from pyscf.dh import util
 from pyscf import dft, lib
@@ -177,22 +178,93 @@ def numint_customized(flags, xc):
         A customized numint object that only evaluates dft grids on given xc.
     """
     # extract the functionals that is parsable by PySCF
-    ni_custom = dft.numint.NumInt()
-    ni_original = dft.numint.NumInt()
-    xc_pyscf_parsable = xc.extract_by_xctype(XCType.PYSCF_PARSABLE)
-    xc_remains = xc.remove(xc_pyscf_parsable, inplace=False)
+    ni_custom = dft.numint.NumInt()  # customized numint, to be returned
+    ni_original = dft.numint.NumInt()  # original numint
+    xc_parsable = xc.extract_by_xctype(XCType.PYSCF_PARSABLE)  # parsable xc; handle it by normal way
+    xc_remains = xc.remove(xc_parsable, inplace=False)  # xc handled in this function
+    hyb = ni_original.hybrid_coeff(xc_parsable.token)  # hybrid coefficient from parsable xc
+    rsh_coeff = ni_original.rsh_coeff(xc_parsable.token)  # range separate coefficients from parsable xc
 
-    def eval_xc_eff_parsable(_numint, _xc_code, rho, *args, **kwargs):
-        return ni_original.eval_xc_eff(xc_pyscf_parsable.token, rho, *args, **kwargs)
+    # parse type of current xc
+    def get_xc_type(xc_list):
+        if len(xc_list.extract_by_xctype(XCType.MGGA)) > 0:
+            xc_type = "MGGA"
+        elif len(xc_list.extract_by_xctype(XCType.GGA)) > 0:
+            xc_type = "GGA"
+        elif len(xc_list.extract_by_xctype(XCType.LDA)) > 0:
+            xc_type = "LDA"
+        else:
+            xc_type = "HF"
+        return xc_type
 
+    xc_type_full = get_xc_type(xc)  # xctype of full xc code
+    xc_type_parsable = get_xc_type(xc_parsable)  # xctype of parsable xc code
+
+    # evaluate parsable xc by normal way
+    def eval_xc_eff_parsable(_numint, _xc_code, rho, xctype=xc_type_parsable, *args, **kwargs):
+        return ni_original.eval_xc_eff(xc_parsable.token, rho, *args, **kwargs)
+
+    # multiply factor (XCInfo.fac) on generated exc, vxc, fxc, kxc
+    def multiply_factor_on_eval_xc_eff(generator, factor):
+        def wrapped(*args, **kwargs):
+            results = generator(*args, **kwargs)
+            for res in results:
+                if res is not None:
+                    res *= factor
+            return results
+        return wrapped
+
+    # lists of xc_eff generators
     gen_lists = [eval_xc_eff_parsable]
 
+    # append xc_eff generators
     for xc_info in xc_remains:
         if XCType.SSR in xc_info.type:
             if XCType.EXCH in xc_info.type:
+                x_code, omega = xc_info.parameters
                 x_fr = xc_info.additional.get("ssr_x_fr", flags["ssr_x_fr"])
-                gen_lists.append(util.eval_xc_eff_ssr_generator(xc_info.parameters[0], ))
+                x_sr = xc_info.additional.get("ssr_x_sr", flags["ssr_x_sr"])
+                generator = util.eval_xc_eff_ssr_generator(x_code, x_fr, x_sr, omega=omega)
+                generator = multiply_factor_on_eval_xc_eff(generator, xc_info.fac)
+                gen_lists.append(generator)
+            elif XCType.CORR in xc_info.type:
+                c_code, omega = xc_info.parameters
+                c_fr = xc_info.additional.get("ssr_c_fr", flags["ssr_c_fr"])
+                c_sr = xc_info.additional.get("ssr_c_sr", flags["ssr_c_sr"])
+                generator = util.eval_xc_eff_ssr_generator(c_code, c_fr, c_sr, omega=omega)
+                generator = multiply_factor_on_eval_xc_eff(generator, xc_info.fac)
+                gen_lists.append(generator)
+            else:
+                assert False
+        else:
+            raise ValueError("Some type of xc is not available!")
 
+    def array_add_with_diff_rows(mat1, mat2):
+        assert len(mat1.shape) == len(mat2.shape)
+        assert mat1.shape[1:] == mat2.shape[1:]
+        if len(mat1) >= len(mat2):
+            mat1[:len(mat2)] += mat2
+            return mat1
+        else:
+            mat2[:len(mat1)] += mat1
+            return mat2
 
+    def eval_xc_eff(*args, **kwargs):
+        exc, vxc, fxc, kxc = gen_lists[0](*args, **kwargs)
+        for gen in gen_lists[1:]:
+            exc1, vxc1, fxc1, kxc1 = gen(*args, **kwargs)
+            if exc is not None:
+                exc = array_add_with_diff_rows(exc, exc1)
+            if vxc is not None:
+                vxc = array_add_with_diff_rows(vxc, vxc1)
+            if fxc is not None:
+                fxc = array_add_with_diff_rows(fxc, fxc1)
+            if kxc is not None:
+                kxc = array_add_with_diff_rows(kxc, kxc1)
+        return exc, vxc, fxc, kxc
 
-
+    ni_custom.eval_xc_eff = MethodType(eval_xc_eff, ni_custom)
+    ni_custom.hybrid_coeff = lambda *args, **kwargs: hyb
+    ni_custom.rsh_coeff = lambda *args, **kwargs: rsh_coeff
+    ni_custom._xc_type = lambda *args, **kwargs: xc_type_full
+    return ni_custom

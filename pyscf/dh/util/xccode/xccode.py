@@ -243,10 +243,15 @@ class XCList:
         self.xc_list = new_list.xc_list
         return self
 
-    def remove(self, info: XCInfo):
-        """ Remove one term form list """
-        self.xc_list.remove(info)
-        return self.sort()
+    def remove(self, info: XCInfo or "XCList", inplace=True):
+        """ Remove one term form list. """
+        lst = self if inplace else self.copy()
+        if isinstance(info, XCInfo):
+            lst.xc_list.remove(info)
+        else:  # isinstance(info, XCList)
+            for i in info:
+                lst.xc_list.remove(i)
+        return lst.trim()
 
     def __iter__(self):
         for info in self.xc_list:

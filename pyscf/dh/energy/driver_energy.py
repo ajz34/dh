@@ -1,3 +1,4 @@
+from pyscf import dft
 from pyscf.dh import util
 from pyscf.dh.energy.rdft import get_rho
 from pyscf.dh.util import XCType

@@ -80,6 +80,8 @@ class XCType(Flag):
     # region special configurations
     SSR = enum.auto()
     "Scaled short-range"
+    PYSCF_PARSABLE = enum.auto()
+    "Functional contribution that is able to be parsed by pyscf.dft.numint"
     # endregion
 
     UNKNOWN = 0

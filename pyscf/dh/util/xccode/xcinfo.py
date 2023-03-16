@@ -172,9 +172,9 @@ class XCInfo:
 
         # detect simple cases of HF and RSH (RSH may have parameters, which may complicates)
         if name == "HF":
-            return XCType.HF | XCType.EXCH
+            return XCType.HF | XCType.EXCH | XCType.PYSCF_PARSABLE
         if name in ["LR_HF", "SR_HF", "RSH"]:
-            return XCType.RSH | XCType.EXCH
+            return XCType.RSH | XCType.EXCH | XCType.PYSCF_PARSABLE
 
         # detect usual cases
         if guess_type & XCType.CORR:
@@ -182,6 +182,7 @@ class XCInfo:
         try:
             # try if pyscf parse_xc success (must be low_rung)
             dft_type = ni._xc_type(guess_name)
+            xc_type |= XCType.PYSCF_PARSABLE
             # except special cases
             if name == "VV10" and len(xc_info.parameters) > 0:
                 raise KeyError("We use VV10 as vDW correction with parameters, instead of XC_GGA_XC_VV10.")

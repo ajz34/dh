@@ -29,3 +29,4 @@ from .helper_pyscf import (
     parse_frozen_numbers, parse_frozen_list, restricted_biorthogonalize)
 from .xccode.xccode import XCInfo, XCList, XCDH
 from .xccode.xctype import XCType
+from .numint_addon import eval_xc_eff_ssr_generator
