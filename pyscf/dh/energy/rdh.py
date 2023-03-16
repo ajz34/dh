@@ -17,7 +17,7 @@ from pyscf.dh.util import XCDH, XCList
 
 class RDH(lib.StreamObject):
     """ Restricted doubly hybrid class. """
-    mf: dft.rks.RKS
+    _scf: dft.rks.RKS
     """ Self consistent object. """
     xc: XCDH
     """ Doubly hybrid functional exchange-correlation code. """
@@ -37,80 +37,154 @@ class RDH(lib.StreamObject):
         else:
             self.params = Params({}, HybridDict(), {})
         self.params.flags.set_default_dict(util.get_default_options())
-        # generate mf object
+        # set molecule
+        mol = mf_or_mol if isinstance(mf_or_mol, gto.Mole) else mf_or_mol.mol
+        # logger
         log = lib.logger.new_logger(verbose=mf_or_mol.verbose)
+        self.verbose = mol.verbose
+        self.log = lib.logger.new_logger(verbose=self.verbose)
+        # generate mf object
         xc = xc if isinstance(xc, XCDH) else XCDH(xc)
         xc_code_scf = xc.xc_scf.token
-        if isinstance(mf_or_mol, gto.Mole):
-            log.note("Molecule object passed-in. Generate an SCF object and evaluate SCF first.\n")
-            mol = mf_or_mol
-            if self.restricted:
-                mf = dft.RKS(mol, xc=xc_code_scf)
-            else:
-                mf = dft.UKS(mol, xc=xc_code_scf)
-            # handle ri in scf
+        # generate with_df object
+        auxbasis_ri = self.params.flags["auxbasis_ri"]
+        if not isinstance(mf_or_mol, gto.Mole):
+            # rks or uks
+            mf = mf_or_mol
             integral_scheme_scf = self.params.flags["integral_scheme_scf"].replace("-", "").lower()
-            is_ri_scf = integral_scheme_scf.startswith("ri")
-            is_ri_jonx = integral_scheme_scf in ["rij", "rijonx"]
-            if is_ri_scf:
-                log.note(
-                    "SCF object uses RI.\n"
-                    "Density fitting basis set is set to aug-etb.\n"
-                    "To custom RI basis in SCF, please modify `mf.mf.with_df` then run SCF object.")
-                mf = mf.density_fit(df.aug_etb(mol), only_dfj=is_ri_jonx)
+            if integral_scheme_scf.startswith("ri") and not hasattr(mf, "with_df"):
+                log.warn("Option integral_scheme_scf is set to RI but no density-fitting object found in SCF instance!")
+            if integral_scheme_scf in ("rijonx", "rij") and (not hasattr(mf, "only_dfj") or not mf.only_dfj):
+                log.warn("Option integral_scheme_scf is set to RIJONX but actually not in SCF instance!")
+            if auxbasis_ri is None and hasattr(mf, "with_df"):
+                self.with_df = mf.with_df
+                log.info("[INFO] Use density fitting object from SCF when evaluating post-SCF.")
+            else:
+                if auxbasis_ri is None:
+                    auxbasis_ri = df.aug_etb(mol)
+                    log.info("[INFO] Generate auxbasis_ri by aug-etb automatically.")
+                self.with_df = df.DF(mol, auxbasis=auxbasis_ri)
+        else:
+            # no possible SCF with_df, then generate one
+            if auxbasis_ri is None:
+                auxbasis_ri = df.aug_etb(mol)
+                log.info("[INFO] Generate auxbasis_ri by aug-etb automatically.")
+            self.with_df = df.DF(mol, auxbasis=auxbasis_ri)
+        # build SCF object
+        if isinstance(mf_or_mol, gto.Mole):
+            mol = mf_or_mol
+            self.build_scf(mol, xc.xc_scf)
+            mf = self._scf
         else:
             mf = mf_or_mol
+            self._scf = mf
         # transform mf if pyscf.scf instead of pyscf.dft
-        if mf.e_tot != 0 and not mf.converged:
-            log.warn("SCF not converged!")
         if not hasattr(mf, "xc"):
             log.warn("We only accept density functionals here.\n"
                      "If you pass an HF instance, we convert to KS object naively.")
             mf = mf.to_rks("HF") if self.restricted else mf.to_uks("HF")
             if mf.grids.weights is None:
                 mf.initialize_grids()
-        self.mf = mf
+        self._scf = mf
         # parse xc code
         if xc_code_scf != XCList(mf.xc, code_scf=True).token:
             log.warn("xc code for SCF functional is not the same from input and SCF object!\n" +
                      "Input xc for SCF: {:}\n".format(xc_code_scf) +
-                     "SCF object xc   : {:}\n".format(self.mf.xc) +
+                     "SCF object xc   : {:}\n".format(self._scf.xc) +
                      "Input xc for eng: {:}\n".format(xc.xc_eng.token) +
                      "Use SCF object xc for SCF functional, input xc for eng as energy functional.")
             xc.xc_scf = XCList(mf.xc, code_scf=True)
         self.xc = xc
-        # parse density fitting object
-        self.with_df = with_df
-        if self.with_df is None and hasattr(mf, "with_df"):
-            log.note(
-                "RI object for doubly hybrid takes as the same from SCF.\n"
-                "We do not generate new RI object by default.")
-            self.with_df = mf.with_df
-        if self.with_df is None:
-            log.note(
-                "RI object for doubly hybrid not found.\n"
-                "Generate a pyscf.df.DF object by default aug-etb settings.\n")
-            self.with_df = df.DF(self.mol, df.aug_etb(self.mol))
-        log.note(
-            "To customize RI object for doubly hybrid instance,\n"
-            "please modify `mf.with_df` to be pyscf.df.DF instance.")
         # parse other objects
-
         self.with_df_2 = None
-        self.verbose = self.mol.verbose
-        self.log = lib.logger.new_logger(verbose=self.verbose)
         self.siepa_screen = erfc
 
+    def build_scf(self, mol, xc):
+        """ Build self-consistent instance.
+
+        This object handles situations of
+        - specifing how density fitting performed;
+        - self-defined numint object;
+        - (possibly more ...)
+
+        Several parameters used should be defined from parameter list:
+        - integral_scheme_scf
+        - auxbasis_jk
+
+        Parameters
+        ----------
+        mol : gto.Mole
+            Molecule instance.
+        xc : str or XCList
+            Full exchange-correlation for SCF evaluation.
+
+        Returns
+        -------
+        dft.rks.RKS or dft.uks.UKS
+        """
+        log = self.log
+        # build density fitting object
+        if self.with_df._cderi is None:
+            self.with_df.build()
+        # build scf object anyway
+        if isinstance(xc, str):
+            xc_token = xc
+        else:
+            xc_token = xc.token
+        if self.restricted:
+            mf = dft.RKS(mol, xc=xc_token)
+        else:
+            mf = dft.UKS(mol, xc=xc_token)
+        # test if numint should be customized
+        ni = mf._numint
+        try:
+            ni._xc_type(xc_token)
+        except KeyError:
+            raise NotImplementedError("dft.numint.NumInt object should be customized!")
+        # handle ri in scf
+        integral_scheme_scf = self.params.flags["integral_scheme_scf"].replace("-", "").lower()
+        is_ri_scf = integral_scheme_scf.startswith("ri")
+        is_ri_jonx = integral_scheme_scf in ["rij", "rijonx"]
+        if is_ri_scf:
+            log.info("[INFO] SCF object uses RI.")
+            log.info("[INFO] Do RI-J only without RI-K: {:}".format(is_ri_jonx))
+            auxbasis_jk = self.params.flags["auxbasis_jk"]
+            if auxbasis_jk is None:
+                log.info("[INFO] Use auxiliary basis set from post-SCF configuration.")
+                mf = mf.density_fit(df.aug_etb(mol), with_df=self.with_df, only_dfj=is_ri_jonx)
+            else:
+                mf = mf.density_fit(auxbasis=auxbasis_jk, only_dfj=is_ri_jonx)
+        self._scf = mf
+
     def build(self):
-        if self.mf.mo_coeff is None:
-            self.mf.run()
-        if self.mf.grids.weights is None:
-            self.mf.initialize_grids(dm=self.make_rdm1_scf())
+        """ Build essential parts of doubly hybrid instance.
+
+        Build process should be performed only once. Rebuild this instance shall not cost any time.
+        """
+        if not hasattr(self.scf, "xc"):
+            self.log.warn("We only accept density functionals here.\n"
+                     "If you pass an HF instance, we convert to KS object naively.")
+            self._scf = self.scf.to_rks("HF") if self.restricted else self.scf.to_uks("HF")
+        if self.scf.mo_coeff is None:
+            self.log.info("[INFO] Molecular coefficients not found. Run SCF first.")
+            self.scf.run()
+        if self.scf.e_tot != 0 and not self.scf.converged:
+            self.log.warn("SCF not converged!")
+        if self.scf.grids.weights is None:
+            self.scf.initialize_grids(dm=self.make_rdm1_scf())
+
+    @property
+    def scf(self) -> dft.rks.RKS:
+        """ A more linting favourable replacement of attribute ``_scf``. """
+        return self._scf
 
     @property
     def mol(self) -> gto.Mole:
         """ Molecular object. """
-        return self.mf.mol
+        if hasattr(self, "_scf") and self.scf:
+            return self.scf.mol
+        else:
+            return self.with_df.mol
 
     @property
     def nao(self) -> int:
@@ -120,7 +194,7 @@ class RDH(lib.StreamObject):
     @property
     def nmo(self) -> int:
         """ Number of molecular orbitals. """
-        return self.mf.mo_coeff.shape[-1]
+        return self.scf.mo_coeff.shape[-1]
 
     @property
     def nocc(self) -> int:
@@ -208,26 +282,26 @@ class RDH(lib.StreamObject):
     def mo_coeff(self) -> np.ndarray:
         """ Molecular orbital coefficient. """
         shuffle_frz = self.get_shuffle_frz()
-        return self.mf.mo_coeff[:, shuffle_frz]
+        return self.scf.mo_coeff[:, shuffle_frz]
 
     @property
     def mo_occ(self) -> np.ndarray:
         """ Molecular orbital occupation number. """
         shuffle_frz = self.get_shuffle_frz()
-        return self.mf.mo_occ[shuffle_frz]
+        return self.scf.mo_occ[shuffle_frz]
 
     @property
     def mo_energy(self) -> np.ndarray:
         """ Molecular orbital energy. """
         shuffle_frz = self.get_shuffle_frz()
-        return self.mf.mo_energy[shuffle_frz]
+        return self.scf.mo_energy[shuffle_frz]
 
     def make_rdm1_scf(self, mo_coeff=None, mo_occ=None):
         if mo_coeff is None:
             mo_coeff = self.mo_coeff
         if mo_occ is None:
             mo_occ = self.mo_occ
-        dm = self.mf.make_rdm1(mo_coeff=mo_coeff, mo_occ=mo_occ)
+        dm = self.scf.make_rdm1(mo_coeff=mo_coeff, mo_occ=mo_occ)
         return dm
 
     @property

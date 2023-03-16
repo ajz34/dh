@@ -1,6 +1,5 @@
 import unittest
-from pyscf import dh, gto, dft, df
-import numpy as np
+from pyscf import dh, gto, df
 
 
 """
@@ -33,7 +32,7 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         mf = dh.RDH(mol, xc="B2PLYP", params=params)
         mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-ri")
         mf.run()
-        self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
+        self.assertAlmostEqual(mf._scf.e_tot, REF_ESCF, places=5)
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
     def test_B2GPPLYP(self):
@@ -45,13 +44,13 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
 
         params = dh.util.Params(flags={
             "integral_scheme_scf": "RI-JK",
-            "frozen_rule": "FreezeNobleGasCore"
+            "frozen_rule": "FreezeNobleGasCore",
+            "auxbasis_jk": "cc-pVTZ-jkfit",
+            "auxbasis_ri": "cc-pVTZ-ri",
         })
         mf = dh.RDH(mol, xc="B2GPPLYP", params=params)
-        mf.mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-jkfit")
-        mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-ri")
         mf.run()
-        self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
+        self.assertAlmostEqual(mf._scf.e_tot, REF_ESCF, places=5)
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
     def test_DSDPBEP86(self):
@@ -64,14 +63,14 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
 
         params = dh.util.Params(flags={
             "integral_scheme_scf": "RI-JK",
-            "frozen_rule": "FreezeNobleGasCore"
+            "frozen_rule": "FreezeNobleGasCore",
+            "auxbasis_jk": "cc-pVTZ-jkfit",
+            "auxbasis_ri": "cc-pVTZ-ri",
         })
         mf = dh.RDH(mol, xc="DSD-PBEP86-D3", params=params)
-        mf.mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-jkfit")
-        mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-ri")
         mf.run()
         print()
-        print(mf.mf.e_tot)
+        print(mf._scf.e_tot)
         print(mf.e_tot)
         # self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
         # self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
@@ -83,11 +82,11 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
 
         params = dh.util.Params(flags={
             "integral_scheme_scf": "RI-JK",
-            "frozen_rule": "FreezeNobleGasCore"
+            "frozen_rule": "FreezeNobleGasCore",
+            "auxbasis_jk": "cc-pVTZ-jkfit",
+            "auxbasis_ri": "cc-pVTZ-ri",
         })
         mf = dh.RDH(mol, xc="XYG3", params=params)
-        mf.mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-jkfit")
-        mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-ri")
         mf.run()
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
 
@@ -100,14 +99,14 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
 
         params = dh.util.Params(flags={
             "integral_scheme_scf": "RI-JK",
-            "frozen_rule": "FreezeNobleGasCore"
+            "frozen_rule": "FreezeNobleGasCore",
+            "auxbasis_jk": "cc-pVTZ-jkfit",
+            "auxbasis_ri": "cc-pVTZ-ri",
         })
         mf = dh.RDH(mol, xc="SCAN", params=params)
-        mf.mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-jkfit")
-        mf.with_df = df.DF(mol, auxbasis="cc-pVTZ-ri")
         mf.run()
         print()
-        print(mf.mf.e_tot)
+        print(mf._scf.e_tot)
         print(mf.e_tot)
         # self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
         # self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)
@@ -125,5 +124,5 @@ class TestMP2LikeDHwithMRCC(unittest.TestCase):
         })
         mf = dh.RDH(mol_, xc="lrc-XYG3", params=params)
         mf.run()
-        self.assertAlmostEqual(mf.mf.e_tot, REF_ESCF, places=5)
+        self.assertAlmostEqual(mf._scf.e_tot, REF_ESCF, places=5)
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)

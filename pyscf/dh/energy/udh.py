@@ -97,19 +97,19 @@ class UDH(RDH):
     def mo_coeff(self) -> np.ndarray:
         """ Molecular orbital coefficient. """
         shuffle_frz = self.get_shuffle_frz()
-        return np.array([self.mf.mo_coeff[s][:, shuffle_frz[s]] for s in (0, 1)])
+        return np.array([self.scf.mo_coeff[s][:, shuffle_frz[s]] for s in (0, 1)])
 
     @property
     def mo_occ(self) -> np.ndarray:
         """ Molecular orbital occupation number. """
         shuffle_frz = self.get_shuffle_frz()
-        return np.array([self.mf.mo_occ[s][shuffle_frz[s]] for s in (0, 1)])
+        return np.array([self.scf.mo_occ[s][shuffle_frz[s]] for s in (0, 1)])
 
     @property
     def mo_energy(self) -> np.ndarray:
         """ Molecular orbital energy. """
         shuffle_frz = self.get_shuffle_frz()
-        return np.array([self.mf.mo_energy[s][shuffle_frz[s]] for s in (0, 1)])
+        return np.array([self.scf.mo_energy[s][shuffle_frz[s]] for s in (0, 1)])
 
     @property
     def mo_coeff_act(self) -> List[np.ndarray]:

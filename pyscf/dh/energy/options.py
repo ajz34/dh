@@ -38,6 +38,22 @@ frac_num = None
 Should be list of floats, size as ``(nmo, )``.
 """
 
+auxbasis_ri = None
+""" Auxiliary basis set for resolution of identity in post-SCF.
+
+By default,
+- If SCF object exists and is density-fitted, then default of post-SCF will still still use this instance;
+- Otherwise, use aug-etb generated basis set.
+"""
+
+auxbasis_jk = None
+""" Auxiliary basis set for resolution of identity in SCF.
+
+By default,
+- If SCF object does not exist, then use the same configuration of ``auxbasis_ri``;
+- Otherwise, use aug-etb generated basis set.
+"""
+
 # endregion
 
 # region Process control

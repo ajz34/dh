@@ -35,7 +35,7 @@ class XCList:
         if token:
             if not isinstance(code_scf, bool):
                 raise ValueError("Must pass boolean option of `code_scf`.")
-            self.build_from_token(token, code_scf, **kwargs)
+            self.xc_list = self.build_from_token(token, code_scf, **kwargs)
 
     @classmethod
     def build_from_token(

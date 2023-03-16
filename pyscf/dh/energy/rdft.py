@@ -21,14 +21,12 @@ def driver_energy_dh(mf_dh):
     """
     xc = mf_dh.xc
     log = mf_dh.log
-    if mf_dh.mf.mo_coeff is None:
-        log.warn("SCF object is not initialized. Build DH object (run SCF) first.")
-        mf_dh.build()
+    mf_dh.build()
     ni = dft.numint.NumInt()
     result = dict()
     eng_tot = 0.
     # 0. noxc part
-    result.update(mf_dh.kernel_energy_noxc(mf_dh.mf, mf_dh.make_rdm1_scf()))
+    result.update(mf_dh.kernel_energy_noxc(mf_dh.scf, mf_dh.make_rdm1_scf()))
     eng_tot += result["eng_noxc"]
     # 1. parse energy of xc_hyb
     # exact exchange contributions
@@ -36,7 +34,7 @@ def driver_energy_dh(mf_dh):
     for info in xc_exx:
         log.info("[INFO] EXX to be evaluated: {:}".format(info.token))
         if info.name == "HF":
-            result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.make_rdm1_scf()))
+            result.update(mf_dh.kernel_energy_exactx(mf_dh.scf, mf_dh.make_rdm1_scf()))
             eng = result["eng_HF"]
             log.note("[RESULT] eng_HF {:20.12f}".format(eng))
             eng_tot += info.fac * eng
@@ -44,7 +42,7 @@ def driver_energy_dh(mf_dh):
             assert info.name == "LR_HF"
             assert len(info.parameters) == 1
             omega = info.parameters[0]
-            result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.make_rdm1_scf(), omega))
+            result.update(mf_dh.kernel_energy_exactx(mf_dh.scf, mf_dh.make_rdm1_scf(), omega))
             eng = result["eng_LR_HF({:})".format(omega)]
             log.note("[RESULT] eng_LR_HF({:}) {:20.12f}".format(omega, eng))
             eng_tot += info.fac * eng
@@ -54,7 +52,7 @@ def driver_energy_dh(mf_dh):
     if len(token) > 0:
         # pure contribution
         log.info("DFT integral XC to be evaluated: {:}".format(token))
-        grids = mf_dh.mf.grids
+        grids = mf_dh.scf.grids
         rho = get_rho(mf_dh.mol, grids, mf_dh.make_rdm1_scf())
         result.update(mf_dh.kernel_energy_purexc([token], rho, grids.weights, mf_dh.restricted))
         eng = result["eng_purexc_{:}".format(token)]
@@ -66,7 +64,7 @@ def driver_energy_dh(mf_dh):
             if "eng_HF" in result:
                 eng = result["eng_HF"]
             else:
-                result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.make_rdm1_scf()))
+                result.update(mf_dh.kernel_energy_exactx(mf_dh.scf, mf_dh.make_rdm1_scf()))
                 eng = result["eng_HF"]
                 log.note("[RESULT] eng_HF {:20.12f}".format(eng))
             eng_tot += hyb * eng
@@ -74,7 +72,7 @@ def driver_energy_dh(mf_dh):
             if "eng_LR_HF({:})".format(omega) in result:
                 eng = result["eng_LR_HF({:})".format(omega)]
             else:
-                result.update(mf_dh.kernel_energy_exactx(mf_dh.mf, mf_dh.make_rdm1_scf(), omega))
+                result.update(mf_dh.kernel_energy_exactx(mf_dh.scf, mf_dh.make_rdm1_scf(), omega))
                 eng = result["eng_LR_HF({:})".format(omega)]
                 log.note("[RESULT] eng_LR_HF({:}) {:20.12f}".format(omega, eng))
             eng_tot += (alpha - hyb) * eng
@@ -136,8 +134,8 @@ def driver_energy_dh(mf_dh):
         if info.name == "VV10":
             nlc_pars = info.parameters
             assert len(nlc_pars) == 2
-            grids = mf_dh.mf.grids
-            nlcgrids = mf_dh.mf.nlcgrids
+            grids = mf_dh.scf.grids
+            nlcgrids = mf_dh.scf.nlcgrids
             res = mf_dh.kernel_energy_vv10(
                 mf_dh.mol, mf_dh.make_rdm1_scf(), nlc_pars, grids, nlcgrids,
                 verbose=mf_dh.verbose)

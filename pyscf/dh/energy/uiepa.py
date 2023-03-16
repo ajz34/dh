@@ -41,7 +41,7 @@ def driver_energy_uiepa(mf_dh):
     elif flags["integral_scheme"].lower().startswith("conv"):
         log.warn("Conventional integral of MP2 is not recommended!\n"
                  "Use density fitting approximation is recommended.")
-        eri_or_mol = mf_dh.mf._eri
+        eri_or_mol = mf_dh.scf._eri
         if eri_or_mol is None:
             eri_or_mol = mf_dh.mol
         nVir = mf_dh.nVir

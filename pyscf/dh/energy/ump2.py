@@ -54,7 +54,7 @@ def driver_energy_ump2(mf_dh):
 
         # MP2 kernels
         if integral_scheme.startswith("conv"):
-            eri_or_mol = mf_dh.mf._eri if omega == 0 else mol
+            eri_or_mol = mf_dh.scf._eri if omega == 0 else mol
             if eri_or_mol is None:
                 eri_or_mol = mol
             with mol.with_range_coulomb(omega):
