@@ -28,7 +28,23 @@ class RDH(lib.StreamObject):
     siepa_screen: callable
     """ Screen function for sIEPA. """
 
-    def __init__(self, mf_or_mol, xc, params=None, with_df=None):
+    def __init__(self, mf_or_mol, xc, params=None):
+        """ Initialize DH.
+
+        In ``__init__`` function, we do not handle parameter-specific initialization.
+        To further build this instance,
+        - ``initialize`` genarates necessary components (SCF instance, auxiliary basis, xc, etc) without computation.
+        - ``build`` calls ``initialize``, and then perform computation of auxiliary basis and SCF.
+
+        Parameters
+        ----------
+        mf_or_mol : gto.Mole or dft.rks.RKS or dft.uks.UKS
+            Molecule or SCF object.
+        xc : str or XCDH
+            Exchange-correlation string.
+        params : Params
+            Additional parameters
+        """
         # initialize parameters
         if params:
             self.params = params
@@ -37,10 +53,22 @@ class RDH(lib.StreamObject):
         self.params.flags.set_default_dict(util.get_default_options())
         # set molecule
         mol = mf_or_mol if isinstance(mf_or_mol, gto.Mole) else mf_or_mol.mol
+        self.mol = mol
         # logger
-        log = lib.logger.new_logger(verbose=mf_or_mol.verbose)
         self.verbose = mol.verbose
         self.log = lib.logger.new_logger(verbose=self.verbose)
+        self.xc = xc
+        # parse other objects
+        self.with_df_2 = None
+        self.siepa_screen = erfc
+        # to be further initialized
+        self._mf_or_mol = mf_or_mol
+
+    def initialize(self):
+        xc = self.xc
+        log = self.log
+        mf_or_mol = self._mf_or_mol
+        mol = self.mol
         # generate mf object
         xc = xc if isinstance(xc, XCDH) else XCDH(xc)
         xc_code_scf = xc.xc_scf.token
@@ -93,9 +121,6 @@ class RDH(lib.StreamObject):
                      "Use SCF object xc for SCF functional, input xc for eng as energy functional.")
             xc.xc_scf = XCList(mf.xc, code_scf=True)
         self.xc = xc
-        # parse other objects
-        self.with_df_2 = None
-        self.siepa_screen = erfc
 
     def build_scf(self, mol, xc_list):
         """ Build self-consistent instance.
@@ -159,6 +184,9 @@ class RDH(lib.StreamObject):
 
         Build process should be performed only once. Rebuild this instance shall not cost any time.
         """
+        if not hasattr(self, "_scf"):
+            self.log.info("[INFO] SCF object not built. Do initialize first.")
+            self.initialize()
         if not hasattr(self.scf, "xc"):
             self.log.warn("We only accept density functionals here.\n"
                      "If you pass an HF instance, we convert to KS object naively.")
@@ -175,14 +203,6 @@ class RDH(lib.StreamObject):
     def scf(self) -> dft.rks.RKS:
         """ A more linting favourable replacement of attribute ``_scf``. """
         return self._scf
-
-    @property
-    def mol(self) -> gto.Mole:
-        """ Molecular object. """
-        if hasattr(self, "_scf") and self.scf:
-            return self.scf.mol
-        else:
-            return self.with_df.mol
 
     @property
     def nao(self) -> int:
