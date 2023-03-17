@@ -69,7 +69,7 @@
         "family": "ZRPS"
     },
     "RS_PBE_P86": {
-        "code": "LR_HF(0.7) + 0.5*SR_HF(0.7) + 0.5*SSR(GGA_X_PBE, 0.7), 0.75*SSR(GGA_C_P86, 0.7) + 0.5*MP2(1, 1) - 0.25*SR_MP2(-0.7) + 0.5*LR_MP2(0.7)",
+        "code": "LR_HF(0.7) + 0.5*SR_HF(0.7) + 0.5*SSR(GGA_X_PBE, 0.7), 0.75*SSR(GGA_C_P86, 0.7) + 0.5*MP2(1, 1) - 0.25*SR_MP2(0.7) + 0.5*LR_MP2(0.7)",
         "ref": "10.1021/acs.jctc.0c01135"
     }
 }
