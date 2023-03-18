@@ -37,6 +37,7 @@ def driver_energy_riepa(mf_dh):
 
     Calculation of this driver forces using density fitting MP2.
     """
+    mf_dh.build()
     flags = mf_dh.params.flags
     log = mf_dh.log
     # parse frozen orbitals

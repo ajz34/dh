@@ -150,7 +150,7 @@ class TestUMP2(unittest.TestCase):
         int3c2e_ig1_cd = np.linalg.solve(L, int3c2e_ig1.reshape(3 * mol.nao**2, -1).T).reshape(-1, 3, mol.nao, mol.nao)
         int3c2e_2_cd = int3c2e_cd + 2 * lib.einsum("Ptuv, t -> Puv", -1j * int3c2e_ig1_cd, dev_xyz_B)
 
-        mf = dh.energy.UDH(mf_s, xc="MP2")
+        mf = dh.energy.UDH(mf_s, xc="MP2").build()
         mf.with_df = df.DF(mol, df.aug_etb(mol))
         mf.with_df._cderi = int3c2e_cd
         mf.with_df_2 = df.DF(mol, df.aug_etb(mol))

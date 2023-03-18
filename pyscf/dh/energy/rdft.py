@@ -102,7 +102,7 @@ def get_rho(mol, grids, dm):
     return rho
 
 
-def kernel_energy_purexc(xc_list, rho, weights, restricted):
+def kernel_energy_purexc(xc_list, rho, weights, restricted, numint=None):
     """ Evaluate energy contributions of exchange-correlation effects.
 
     Note that this kernel does not count HF, LR_HF and advanced correlation into account.
@@ -118,6 +118,8 @@ def kernel_energy_purexc(xc_list, rho, weights, restricted):
         Full list of DFT grid weights.
     restricted : bool
         Indicator of restricted or unrestricted of incoming rho.
+    numint : dft.numint.NumInt
+        Special numint item if required.
 
     See Also
     --------
@@ -126,15 +128,14 @@ def kernel_energy_purexc(xc_list, rho, weights, restricted):
     if isinstance(xc_list, str):
         xc_list = [xc_list]
     results = {}
-    ni = dft.numint.NumInt()
+    ni = dft.numint.NumInt() if numint is None else numint
     if restricted:
         wrho0 = rho[0] * weights
     else:
         wrho0 = rho[:, 0].sum(axis=0) * weights
 
     for xc in xc_list:
-        spin = 0 if restricted else 1
-        exc = ni.eval_xc(xc, rho, spin=spin, deriv=0)[0]
+        exc = ni.eval_xc_eff(xc, rho, deriv=0)[0]
         results["eng_purexc_" + xc] = exc @ wrho0
     return results
 

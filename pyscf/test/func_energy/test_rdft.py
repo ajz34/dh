@@ -20,7 +20,7 @@ class TestRDFT(unittest.TestCase):
         # DH object from SCF with VV10
         # note that VV10 parameters should be explicitly defined in xc_code
         xc_code = "wB97M_V, VV10(6.0; 0.01)"
-        mf_dh = dh.energy.RDH(mf, xc_code).run()
+        mf_dh = dh.energy.RDH(mol, xc_code).run()
         print(mf_dh.e_tot)
         print(mf.e_tot)
         self.assertTrue(np.allclose(mf_dh.e_tot, mf.e_tot, rtol=0, atol=1e-6))
@@ -61,3 +61,26 @@ class TestRDFT(unittest.TestCase):
         # DH object from molecule and xc_code directly
         mf_dh = dh.energy.RDH(mol, "XYG3").run()
         self.assertTrue(np.allclose(mf_dh.e_tot, -76.29073335525743, rtol=0, atol=1e-6))
+
+    def test_RS_PBE_P86(self):
+        # test of force using debug_force_eng_low_rung_revaluate
+        # reference: MRCC
+        # test case: MINP_H2O_cc-pVTZ_RKS_B2PLYP
+        REF_ESCF = -76.219885498301
+        REF_ETOT = -76.315858865489
+
+        mol = gto.Mole(atom="""
+        O     0.00000000    0.00000000   -0.12502304
+        H     0.00000000    1.43266384    0.99210317
+        H     0.00000000   -1.43266384    0.99210317
+        """, basis="aug-cc-pVDZ", unit="AU").build()
+        params = dh.util.Params(flags={
+            "frozen_rule": "FreezeNobleGasCore",
+            "auxbasis_jk": "aug-cc-pVDZ-jkfit",
+            "auxbasis_ri": "aug-cc-pVDZ-ri",
+            "debug_force_eng_low_rung_revaluate": True,
+        })
+        mf = dh.RDH(mol, xc="RS-PBE-P86", params=params)
+        mf.run()
+        self.assertAlmostEqual(mf._scf.e_tot, REF_ESCF, places=5)
+        self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)

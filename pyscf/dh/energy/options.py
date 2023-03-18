@@ -175,3 +175,10 @@ ssr_c_sr = "LDA_C_PW_ERF"
 """ Short-range correlation functional for scaled short-range method. """
 
 # endregion
+
+# region Debug options
+
+debug_force_eng_low_rung_revaluate = False
+""" Re-evaluate all low-rung components in xc_eng functional. """
+
+# endregion

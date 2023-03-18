@@ -41,6 +41,7 @@ def driver_energy_rmp2(mf_dh):
 
     This function does not make checks, such as SCF convergence.
     """
+    mf_dh.build()
     mol = mf_dh.mol
     frac_num = mf_dh.params.flags["frac_num"]
     # parse frozen orbitals

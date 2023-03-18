@@ -104,6 +104,8 @@ class RDH(lib.StreamObject):
         else:
             mf = mf_or_mol
             self._scf = mf
+            if hasattr(mf, "nlc") and mf.nlc != "":
+                raise ValueError("Note that SCF with NLC in dh is not supported! You may get erronuous value!")
         # transform mf if pyscf.scf instead of pyscf.dft
         if not hasattr(mf, "xc"):
             log.warn("We only accept density functionals here.\n"
@@ -178,6 +180,7 @@ class RDH(lib.StreamObject):
             else:
                 mf = mf.density_fit(auxbasis=auxbasis_jk, only_dfj=is_ri_jonx)
         self._scf = mf
+        return self
 
     def build(self):
         """ Build essential parts of doubly hybrid instance.
@@ -198,6 +201,7 @@ class RDH(lib.StreamObject):
             self.log.warn("SCF not converged!")
         if self.scf.grids.weights is None:
             self.scf.initialize_grids(dm=self.make_rdm1_scf())
+        return self
 
     @property
     def scf(self) -> dft.rks.RKS:

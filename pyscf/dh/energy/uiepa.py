@@ -27,6 +27,7 @@ def driver_energy_uiepa(mf_dh):
     --------
     pyscf.dh.energy.riepa.driver_energy_riepa
     """
+    mf_dh.build()
     flags = mf_dh.params.flags
     log = mf_dh.log
     mo_energy_act = mf_dh.mo_energy_act
