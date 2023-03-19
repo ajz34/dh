@@ -208,11 +208,23 @@ def _process_energy_low_rung(mf_dh: "RDH", xc_list: XCList, xc_to_parse: XCList 
     eng_tot = 0
     if numint is None:
         numint = dft.numint.NumInt()
+    # exx part
     xc_exx = xc_to_parse.extract_by_xctype(XCType.EXX)
     xc_non_exx = xc_to_parse.remove(xc_exx, inplace=False)
     xc_exx_extracted, eng_exx = _process_energy_exx(mf_dh, xc_exx)
     eng_tot += eng_exx
     assert len(xc_exx_extracted) == 0
+    # dft part with additional exx
+    omega, alpha, hyb = numint.rsh_and_hybrid_coeff(xc_non_exx)
+    hyb_token = ""
+    if abs(hyb) > 1e-10:
+        hyb_token += "+{:}*HF".format(hyb)
+    if abs(omega) > 1e-10:
+        hyb_token += "+{:}*LR_HF({:})".format(alpha - hyb, omega)
+    if len(hyb_token) > 0:
+        _, eng_add_exx = _process_energy_exx(mf_dh, XCList().build_from_token(hyb_token, code_scf=True))
+        eng_tot += eng_add_exx
+    # pure part
     grids = mf_dh.scf.grids
     rho = get_rho(mf_dh.mol, grids, mf_dh.make_rdm1_scf())
     result = mf_dh.kernel_energy_purexc([xc_non_exx.token], rho, grids.weights, mf_dh.restricted, numint=numint)
