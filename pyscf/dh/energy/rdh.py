@@ -40,7 +40,7 @@ class RDH(lib.StreamObject):
         ----------
         mf_or_mol : gto.Mole or dft.rks.RKS or dft.uks.UKS
             Molecule or SCF object.
-        xc : str or XCDH
+        xc : str or tuple or XCDH
             Exchange-correlation string.
         params : Params
             Additional parameters

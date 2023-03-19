@@ -215,7 +215,7 @@ def _process_energy_low_rung(mf_dh: "RDH", xc_list: XCList, xc_to_parse: XCList 
     eng_tot += eng_exx
     assert len(xc_exx_extracted) == 0
     # dft part with additional exx
-    omega, alpha, hyb = numint.rsh_and_hybrid_coeff(xc_non_exx)
+    omega, alpha, hyb = numint.rsh_and_hybrid_coeff(xc_non_exx.token)
     hyb_token = ""
     if abs(hyb) > 1e-10:
         hyb_token += "+{:}*HF".format(hyb)
