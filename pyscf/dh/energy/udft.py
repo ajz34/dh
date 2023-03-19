@@ -32,9 +32,9 @@ def kernel_energy_unrestricted_exactx(mf, dm, omega=None):
     # results
     result = dict()
     if omega is None:
-        result["eng_HF"] = ex
+        result["eng_exx_HF"] = ex
     else:
-        result["eng_LR_HF({:})".format(omega)] = ex
+        result["eng_exx_LR_HF({:})".format(omega)] = ex
     return result
 
 

@@ -21,25 +21,25 @@ def _process_energy_exx(mf_dh: "RDH", xc_list: XCList, force_evaluate=False):
     for info in xc_exx:
         log.info("[INFO] EXX to be evaluated: {:}".format(info.token))
         if info.name == "HF":
-            if force_evaluate or "eng_HF" not in mf_dh.params.results:
+            if force_evaluate or "eng_exx_HF" not in mf_dh.params.results:
                 result.update(mf_dh.kernel_energy_exactx(mf_dh.scf, mf_dh.make_rdm1_scf()))
-                eng = result["eng_HF"]
+                eng = result["eng_exx_HF"]
             else:
-                log.info("[INFO] eng_HF is evaluated. Take previous evaluated value.")
-                eng = mf_dh.params.results["eng_HF"]
-            log.note("[RESULT] eng_HF {:20.12f}".format(eng))
+                log.info("[INFO] eng_exx_HF is evaluated. Take previous evaluated value.")
+                eng = mf_dh.params.results["eng_exx_HF"]
+            log.note("[RESULT] eng_exx_HF {:20.12f}".format(eng))
             eng_tot += info.fac * eng
         else:
             assert info.name == "LR_HF"
             assert len(info.parameters) == 1
             omega = info.parameters[0]
-            if force_evaluate or "eng_LR_HF({:})".format(omega) not in mf_dh.params.results:
+            if force_evaluate or "eng_exx_LR_HF({:})".format(omega) not in mf_dh.params.results:
                 result.update(mf_dh.kernel_energy_exactx(mf_dh.scf, mf_dh.make_rdm1_scf(), omega))
-                eng = result["eng_LR_HF({:})".format(omega)]
+                eng = result["eng_exx_LR_HF({:})".format(omega)]
             else:
-                log.info("[INFO] eng_LR_HF({:}) is evaluated. Take previous evaluated value.".format(omega))
-                eng = mf_dh.params.results["eng_LR_HF({:})".format(omega)]
-            log.note("[RESULT] eng_LR_HF({:}) {:20.12f}".format(omega, eng))
+                log.info("[INFO] eng_exx_LR_HF({:}) is evaluated. Take previous evaluated value.".format(omega))
+                eng = mf_dh.params.results["eng_exx_LR_HF({:})".format(omega)]
+            log.note("[RESULT] eng_exx_LR_HF({:}) {:20.12f}".format(omega, eng))
             eng_tot += info.fac * eng
     mf_dh.params.update_results(result)
     return xc_extracted, eng_tot
