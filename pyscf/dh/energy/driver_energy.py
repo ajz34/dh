@@ -243,7 +243,11 @@ def _process_energy_low_rung(mf_dh: "RDH", xc_list: XCList, xc_to_parse: XCList 
     eng_tot += eng_exx
     assert len(xc_exx_extracted) == 0
     # dft part with additional exx
-    omega, alpha, hyb = numint.rsh_and_hybrid_coeff(xc_non_exx.token)
+    if not (hasattr(numint, "custom") and numint.custom):
+        omega, alpha, hyb = numint.rsh_and_hybrid_coeff(xc_non_exx.token)
+    else:
+        log.info("[INFO] Custom numint detected. We assume exx has already evaluated.")
+        omega, alpha, hyb = 0, 0, 0
     hyb_token = ""
     if abs(hyb) > 1e-10:
         hyb_token += "+{:}*HF".format(hyb)

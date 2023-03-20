@@ -82,5 +82,7 @@ class TestRDFT(unittest.TestCase):
         })
         mf = dh.RDH(mol, xc="RS-PBE-P86", params=params)
         mf.run()
+        for key, val in mf.params.results.items():
+            print(key, val)
         self.assertAlmostEqual(mf._scf.e_tot, REF_ESCF, places=5)
         self.assertAlmostEqual(mf.e_tot, REF_ETOT, places=5)

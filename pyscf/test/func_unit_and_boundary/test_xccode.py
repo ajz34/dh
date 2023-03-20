@@ -29,10 +29,10 @@ class TestXCCode(unittest.TestCase):
         # test rsh
         xc_io(
             "0.6*HF - RSH(0.33, 0.2, 0.5) + 0.4*SR_HF(0.33) - 0.5*LR_HF(0.5)",
-            "0.3*HF + 0.1*LR_HF(0.33) - 0.5*LR_HF(0.5)")
+            "0.3*HF + 0.1*LR_HF(0.33) - 0.5*LR_HF(0.5),")
         xc_io(
             "0.6*HF - RSH(0.33, 0.2, 0.5) + 0.5*SR_HF(0.33) - 0.5*LR_HF(0.5)",
-            "0.4*HF - 0.5*LR_HF(0.5)")
+            "0.4*HF - 0.5*LR_HF(0.5),")
         # test VV10
         xc_io(
             "wB97M_V, VV10(6.0; 0.01) + 0.5*VV10(5.9; 0.0093)",
@@ -45,4 +45,5 @@ class TestXCCode(unittest.TestCase):
         xc_io(
             "M11-L + 0.25*M06-L - 2.0*CAM-B3LYP, PBE - 0.35*LDA - 0.25*MP2cr-OS + 1.5*MP2cr",
             "0.25*M06_L + M11_L - 2*CAM_B3LYP, - 0.35*LDA + PBE + MP2CR(1.25, 1.5)")
+        xc_io("0.75*HF + 0.25*PBE,", "0.75*HF + 0.25*PBE,")
 

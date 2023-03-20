@@ -79,21 +79,32 @@ class XCList:
         token = token.upper().replace(" ", "")
         for key, val in _NAME_WITH_DASH.items():
             token = token.replace(key, val)
+        if len(token) == 0:
+            return []
+        # handle case where only exchange terms
+        all_exch = False
+        if token[-1] == ",":
+            all_exch = True
+            token = token[:-1]
+        # match
         match = re.findall(REGEX_XC, token)
         # sanity check: matched patterns should be exactly equilvant to original token
         if token != "".join([group[0] for group in match]):
             raise ValueError(
-                "XC token {:} is not successfully parsed.\n"
+                "XC token {:} XCTypes not successfully parsed.\n"
                 "Regex match of this token becomes {:}".format(token, "".join([group[0] for group in match])))
         # check if splitting exchange and correlation is required
         # sanity check first: only zero or one comma
         comma_first = [group[0][0] == "," for group in match]
         split_xc = sum(comma_first)
-        if split_xc > 1:
+        if split_xc > 1 or (split_xc == 1 and all_exch):
             raise ValueError("Only zero or one comma is required to split exchange and correlation parts!")
         index_split = -1
         if split_xc:
             index_split = comma_first.index(True)
+        if all_exch:
+            split_xc = 1
+            index_split = len(comma_first)
         xc_list = []
         for n, re_group in enumerate(match):
             if not split_xc:
@@ -183,11 +194,15 @@ class XCList:
     def token(self) -> str:
         """ Return a token that represents xc functional in a somehow standard way. """
         self.sort()
-        xc_list_x = [info for info in self.xc_list if XCType.CORR not in info.type]
-        xc_list_c = [info for info in self.xc_list if XCType.CORR in info.type]
+        if len(self) == 0:
+            return ""
+        xc_list_x = self.extract_by_xctype(lambda t: XCType.CORR not in t)
+        xc_list_c = self.extract_by_xctype(XCType.CORR)
         token = " + ".join([info.token for info in xc_list_x]).replace("+ -", "-")
         if len(xc_list_c) > 0:
             token += ", " + " + ".join([info.token for info in xc_list_c]).replace("+ -", "-")
+        if len(self.extract_by_xctype(XCType.HYB)) == 0 and len(xc_list_c) == 0:
+            token += ","
         token = token.strip()
         return token
 

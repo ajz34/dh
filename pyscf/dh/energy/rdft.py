@@ -268,4 +268,5 @@ def numint_customized(flags, xc):
     ni_custom.hybrid_coeff = lambda *args, **kwargs: hyb
     ni_custom.rsh_coeff = lambda *args, **kwargs: rsh_coeff
     ni_custom._xc_type = lambda *args, **kwargs: xc_type_full
+    ni_custom.custom = True
     return ni_custom
