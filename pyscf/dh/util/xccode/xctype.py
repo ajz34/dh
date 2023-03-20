@@ -55,7 +55,10 @@ class XCType(Flag):
     "Range-separate MP2 correlation contribution"
     IEPA = enum.auto()
     "IEPA-like correlation contribution"
-    RPA = enum.auto()
+
+    RS_RING_CCD = enum.auto()
+    "Range-separate ring-CCD correlation contribution"
+    RPA = RS_RING_CCD
     "RPA-like correlation contribution"
     RUNG_HIGH = MP2 | RSMP2 | IEPA | RPA
     "High-rung (5th) approximation"
@@ -139,6 +142,11 @@ class XCType(Flag):
                 ["same-spin coefficient", True],
             ],
             cls.IEPA: [
+                ["oppo-spin coefficient", True],
+                ["same-spin coefficient", True],
+            ],
+            cls.RS_RING_CCD: [
+                ["range-separate omega", False],
                 ["oppo-spin coefficient", True],
                 ["same-spin coefficient", True],
             ],

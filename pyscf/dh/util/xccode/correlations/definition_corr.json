@@ -30,6 +30,10 @@
         "type": "IEPA",
         "ref": "10.1103/PhysRevLett.117.133002"
     },
+    "RS_RING_CCD": {
+        "type": "RS_RING_CCD",
+        "ref": "10.1063/1.3043729"
+    },
     "VV10": {
         "type": "VDW",
         "ref": "10.1063/1.3521275"

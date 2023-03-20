@@ -7,6 +7,7 @@ from pyscf.dh.energy.driver_energy import driver_energy_dh
 from pyscf.dh.util import Params, HybridDict
 from pyscf.dh.energy.rmp2 import driver_energy_rmp2
 from pyscf.dh.energy.riepa import driver_energy_riepa
+from pyscf.dh.energy.rrpa import driver_energy_rring_ccd
 from pyscf.dh.energy.rdft import (
     kernel_energy_restricted_exactx, kernel_energy_restricted_noxc, kernel_energy_vv10,
     kernel_energy_purexc, get_rho, numint_customized)
@@ -360,6 +361,7 @@ class RDH(lib.StreamObject):
 
     driver_energy_mp2 = driver_energy_rmp2
     driver_energy_iepa = driver_energy_riepa
+    driver_energy_ring_ccd = driver_energy_rring_ccd
     driver_energy_dh = driver_energy_dh
     kernel = driver_energy_dh
 

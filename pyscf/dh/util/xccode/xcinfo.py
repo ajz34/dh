@@ -232,7 +232,7 @@ class XCInfo:
                 "MP2": XCType.MP2,
                 "RSMP2": XCType.RSMP2,
                 "IEPA": XCType.IEPA,
-                "RPA": XCType.RPA,
+                "RS_RING_CCD": XCType.RS_RING_CCD,
                 "VDW": XCType.VDW,
             }
             if name in ADV_CORR_DICT:

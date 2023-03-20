@@ -107,6 +107,34 @@ def _process_energy_mp2(mf_dh: "RDH", xc_list: XCList):
     return xc_extracted, eng_tot
 
 
+def _process_energy_drpa(mf_dh: "RDH", xc_list: XCList):
+    log = mf_dh.log
+    eng_tot = 0
+    xc_ring_ccd = xc_list.extract_by_xctype(XCType.RS_RING_CCD)
+    xc_list = xc_list.remove(xc_ring_ccd, inplace=False)
+    if len(xc_ring_ccd) > 0:
+        log.info("[INFO] XCList extracted by process_energy_drpa (RS_RING_CCD): {:}".format(xc_ring_ccd.token))
+        log.info("[INFO] XCList remains   by process_energy_drpa (RS_RING_CCD): {:}".format(xc_list.token))
+        log.info("[INFO] Ring-CCD detected")
+        # generate omega list
+        # parameter of RSMP2: omega, c_os, c_ss
+        omega_list = []
+        for xc_info in xc_ring_ccd:
+            omega_list.append(xc_info.parameters[0])
+        # run ring-CCD
+        with mf_dh.params.temporary_flags({"omega_list_ring_ccd": omega_list}):
+            mf_dh.driver_energy_ring_ccd()
+        # summarize energies
+        for xc_info in xc_ring_ccd:
+            omega, c_os, c_ss = xc_info.parameters
+            eng = xc_info.fac * (
+                + c_os * mf_dh.params.results[util.pad_omega("eng_RING_CCD_OS", omega)]
+                + c_ss * mf_dh.params.results[util.pad_omega("eng_RING_CCD_SS", omega)])
+            log.info("[RESULT] energy of {:} correlation: {:20.12f}".format(util.pad_omega("RING_CCD", omega), eng))
+            eng_tot += eng
+    return xc_list, eng_tot
+
+
 def _process_energy_vdw(mf_dh: "RDH", xc_list: XCList):
     log = mf_dh.log
     xc_vdw = xc_list.extract_by_xctype(XCType.VDW)
@@ -269,6 +297,9 @@ def driver_energy_dh(mf_dh):
     # 2.2 MP2
     xc_extracted, eng_mp2 = _process_energy_mp2(mf_dh, xc_extracted)
     eng_tot += eng_mp2
+    # 2.2 MP2
+    xc_extracted, eng_drpa = _process_energy_drpa(mf_dh, xc_extracted)
+    eng_tot += eng_drpa
     # 2.3 VV10
     xc_extracted, eng_vdw = _process_energy_vdw(mf_dh, xc_extracted)
     eng_tot += eng_vdw
